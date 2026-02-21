@@ -2,37 +2,73 @@
   {
     "id": "2048",
     "title": "2048",
-    "url": "https://play2048.co/",
-    "thumbnail": "https://picsum.photos/seed/2048/300/200"
+    "url": "https://gabrielecirulli.github.io/2048/",
+    "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/2048_logo.svg/1200px-2048_logo.svg.png"
   },
   {
     "id": "hextris",
     "title": "Hextris",
-    "url": "https://hextris.io/",
-    "thumbnail": "https://picsum.photos/seed/hextris/300/200"
+    "url": "https://hextris.github.io/hextris/",
+    "thumbnail": "https://hextris.io/images/logo.png"
   },
   {
     "id": "t-rex",
     "title": "Dino Run",
-    "url": "https://chromedino.com/",
-    "thumbnail": "https://picsum.photos/seed/dino/300/200"
+    "url": "https://wayou.github.io/t-rex-runner/",
+    "thumbnail": "https://raw.githubusercontent.com/wayou/t-rex-runner/master/assets/default_100_percent/100-offline-sprite.png"
   },
   {
     "id": "flappy",
     "title": "Flappy Bird",
-    "url": "https://flappybird.io/",
-    "thumbnail": "https://picsum.photos/seed/flappy/300/200"
+    "url": "https://nebez.github.io/floppybird/",
+    "thumbnail": "https://nebez.github.io/floppybird/assets/img/bird.png"
   },
   {
     "id": "slope",
     "title": "Slope",
-    "url": "https://krunker.io/",
-    "thumbnail": "https://picsum.photos/seed/slope/300/200"
+    "url": "https://kdata1.com/2020/05/slope/",
+    "thumbnail": "https://play-lh.googleusercontent.com/66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6"
   },
   {
     "id": "tetris",
     "title": "Tetris",
-    "url": "https://tetris.com/play-tetris",
-    "thumbnail": "https://picsum.photos/seed/tetris/300/200"
+    "url": "https://chvin.github.io/react-tetris/",
+    "thumbnail": "https://raw.githubusercontent.com/chvin/react-tetris/master/static/logo.png"
+  },
+  {
+    "id": "eagler12",
+    "title": "Eaglercraft",
+    "url": "https://eaglercraft.com/mc/1.8.8/",
+    "thumbnail": "https://eaglercraft.com/favicon.png"
+  },
+  {
+    "id": "gunspin",
+    "title": "Gunspin",
+    "url": "https://html5.api.gamedistribution.com/39322300062a49808381283659223126/",
+    "thumbnail": "https://img.gamedistribution.com/39322300062a49808381283659223126-512x512.jpeg"
+  },
+  {
+    "id": "cookie-clicker",
+    "title": "Cookie Clicker",
+    "url": "https://cookieclicker.ee/",
+    "thumbnail": "https://orteil.dashnet.org/cookieclicker/img/cookie.png"
+  },
+  {
+    "id": "pacman",
+    "title": "Pacman",
+    "url": "https://pacman.live/play.html",
+    "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/4/49/Pacman.svg"
+  },
+  {
+    "id": "geometry-dash",
+    "title": "Geometry Dash",
+    "url": "https://geometry-dash-lite.io/",
+    "thumbnail": "https://geometry-dash-lite.io/favicon.ico"
+  },
+  {
+    "id": "cut-the-rope",
+    "title": "Cut the Rope",
+    "url": "https://www.cuttherope.ie/",
+    "thumbnail": "https://www.cuttherope.ie/favicon.ico"
   }
 ]

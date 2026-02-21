@@ -29,6 +29,27 @@ db.exec(`
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
+
+  CREATE TABLE IF NOT EXISTS feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    subject TEXT,
+    message TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS game_progress (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    game_id TEXT,
+    game_title TEXT,
+    score TEXT,
+    play_time INTEGER,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    UNIQUE(user_id, game_id)
+  );
 `);
 
 async function startServer() {
@@ -117,6 +138,34 @@ async function startServer() {
       .run(newStreak, newGoalCount, today, req.user.id);
     
     res.json({ streak: newStreak, daily_goal_count: newGoalCount });
+  });
+
+  // Feedback Route
+  app.post('/api/feedback', authenticate, (req, res) => {
+    const { subject, message } = req.body;
+    db.prepare('INSERT INTO feedback (user_id, subject, message) VALUES (?, ?, ?)')
+      .run(req.user.id, subject, message);
+    console.log(`Feedback received for retroshoesco@gmail.com: [${subject}] ${message}`);
+    res.json({ success: true });
+  });
+
+  // Game Progress Routes
+  app.get('/api/game-progress', authenticate, (req, res) => {
+    const progress = db.prepare('SELECT * FROM game_progress WHERE user_id = ?').all(req.user.id);
+    res.json(progress);
+  });
+
+  app.post('/api/game-progress', authenticate, (req, res) => {
+    const { game_id, game_title, score, play_time } = req.body;
+    db.prepare(`
+      INSERT INTO game_progress (user_id, game_id, game_title, score, play_time, updated_at)
+      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(user_id, game_id) DO UPDATE SET
+        score = excluded.score,
+        play_time = game_progress.play_time + excluded.play_time,
+        updated_at = CURRENT_TIMESTAMP
+    `).run(req.user.id, game_id, game_title, score, play_time);
+    res.json({ success: true });
   });
 
   // Vite middleware
