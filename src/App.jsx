@@ -26,12 +26,14 @@ export default function App() {
   const [gameProgress, setGameProgress] = useState([]);
   const [gameStartTime, setGameStartTime] = useState(null);
   const [isCloaked, setIsCloaked] = useState(false);
+  const [isStealthMode, setIsStealthMode] = useState(false);
+  const [gameSearch, setGameSearch] = useState('');
   const lastGameRef = React.useRef(null);
 
-  // Deledao Protection: Panic Key (\)
+  // Deledao Protection: Panic Key (\ or `)
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === '\\') {
+      if (e.key === '\\' || e.key === '`') {
         window.location.href = 'https://classroom.google.com';
       }
     };
@@ -39,37 +41,86 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Deledao Protection: Tab Cloaking
+  // Deledao Protection: Tab Visibility Cloaking
   useEffect(() => {
-    if (isCloaked) {
-      document.title = 'Google Classroom';
-      const link = document.querySelector("link[rel~='icon']");
-      if (link) {
-        link.href = 'https://ssl.gstatic.com/classroom/favicon.png';
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        document.title = 'Google Classroom';
+        const link = document.querySelector("link[rel~='icon']");
+        if (link) link.href = 'https://ssl.gstatic.com/classroom/favicon.png';
+      } else if (!isCloaked) {
+        document.title = 'StudyFlow';
+        const link = document.querySelector("link[rel~='icon']");
+        if (link) link.href = 'https://ssl.gstatic.com/classroom/favicon.png';
       }
-    } else {
-      document.title = 'StudyFlow';
-      const link = document.querySelector("link[rel~='icon']");
-      if (link) {
-        link.href = '/favicon.ico';
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [isCloaked]);
+
+  // Deledao Protection: History Flooding
+  const floodHistory = () => {
+    if (user) {
+      for (let i = 0; i < 5; i++) {
+        window.history.pushState(null, '', window.location.href + '#' + Math.random().toString(36).substring(7));
       }
     }
-  }, [isCloaked]);
+  };
+
+  useEffect(() => {
+    floodHistory();
+    const interval = setInterval(floodHistory, 60000); // Flood every minute
+    return () => clearInterval(interval);
+  }, [user]);
+
+  // Deledao Protection: Tab Cloaking
+  useEffect(() => {
+    const link = document.querySelector("link[rel~='icon']") || document.createElement('link');
+    link.rel = 'icon';
+    
+    if (isCloaked || isStealthMode) {
+      document.title = 'Google Classroom';
+      link.href = 'https://ssl.gstatic.com/classroom/favicon.png';
+    } else {
+      document.title = 'StudyFlow';
+      link.href = 'https://ssl.gstatic.com/classroom/favicon.png'; // Default to classroom for safety
+    }
+    document.getElementsByTagName('head')[0].appendChild(link);
+  }, [isCloaked, isStealthMode]);
 
   // Deledao Protection: About:Blank Cloaking
   const openAboutBlank = () => {
-    const win = window.open();
-    if (!win) return;
-    const url = window.location.href;
-    const iframe = win.document.createElement('iframe');
-    iframe.style.width = '100%';
-    iframe.style.height = '100%';
-    iframe.style.border = 'none';
-    iframe.src = url;
-    win.document.body.style.margin = '0';
-    win.document.body.style.height = '100vh';
-    win.document.body.appendChild(iframe);
-    window.location.replace('https://google.com');
+    try {
+      const win = window.open('about:blank', '_blank');
+      if (!win) {
+        alert('Popup blocked! Please allow popups for this site.');
+        return;
+      }
+      const doc = win.document;
+      const iframe = doc.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.top = '0';
+      iframe.style.left = '0';
+      iframe.style.bottom = '0';
+      iframe.style.right = '0';
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.style.border = 'none';
+      iframe.style.margin = '0';
+      iframe.style.padding = '0';
+      iframe.style.overflow = 'hidden';
+      iframe.style.zIndex = '999999';
+      iframe.src = window.location.href;
+      
+      doc.body.style.margin = '0';
+      doc.body.style.height = '100vh';
+      doc.body.appendChild(iframe);
+      
+      // Close original tab or redirect it
+      window.location.replace('https://google.com');
+    } catch (e) {
+      console.error('About:blank failed', e);
+    }
   };
 
   // Reset loading state when game changes
@@ -413,17 +464,20 @@ export default function App() {
               </div>
 
               <div className="bg-white p-8 rounded-3xl shadow-sm border border-zinc-100">
-                <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center mb-6">
-                  <StickyNote className="w-6 h-6 text-blue-600" />
+                <div className="w-12 h-12 bg-zinc-900 rounded-2xl flex items-center justify-center mb-6">
+                  <Shield className="w-6 h-6 text-white" />
                 </div>
-                <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Saved Notes</h3>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold">{notes.length}</span>
-                  <span className="text-zinc-400 text-sm">entries</span>
+                <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">History Guard</h3>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-zinc-900">Active Protection</span>
+                  <button 
+                    onClick={floodHistory}
+                    className="px-4 py-2 bg-zinc-900 text-white rounded-xl text-xs font-bold hover:bg-zinc-800 transition-all"
+                  >
+                    Flood History
+                  </button>
                 </div>
-                <button onClick={() => setActiveTab('notes')} className="text-xs text-blue-600 font-bold mt-4 flex items-center gap-1 hover:underline">
-                  View all <ChevronRight className="w-3 h-3" />
-                </button>
+                <p className="text-[10px] text-zinc-400 mt-4 font-bold uppercase tracking-widest">Protects against history tracking</p>
               </div>
             </div>
 
@@ -640,43 +694,62 @@ export default function App() {
             animate={{ opacity: 1 }}
             className="max-w-6xl mx-auto"
           >
-            <div className="flex items-center justify-between mb-12">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 gap-6">
               <div>
                 <h2 className="text-4xl font-bold text-zinc-900">Cognitive Modules</h2>
                 <p className="text-zinc-500 mt-2">Supplementary interactive exercises for mental stimulation.</p>
               </div>
-              <button 
-                onClick={() => setActiveTab('dashboard')}
-                className="p-3 hover:bg-white rounded-2xl border border-transparent hover:border-zinc-100 transition-all"
-              >
-                <X className="w-8 h-8 text-zinc-400" />
-              </button>
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" />
+                  <input 
+                    type="text"
+                    placeholder="Search modules..."
+                    value={gameSearch}
+                    className="pl-12 pr-6 py-3 bg-white border border-zinc-100 rounded-2xl outline-none focus:ring-4 focus:ring-zinc-900/5 transition-all w-64"
+                    onChange={(e) => setGameSearch(e.target.value)}
+                  />
+                </div>
+                <button 
+                  onClick={() => setActiveTab('dashboard')}
+                  className="p-3 hover:bg-white rounded-2xl border border-transparent hover:border-zinc-100 transition-all"
+                >
+                  <X className="w-8 h-8 text-zinc-400" />
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-              {gamesData.map((game, index) => (
+              {gamesData
+                .filter(game => game.title.toLowerCase().includes(gameSearch.toLowerCase()))
+                .map((game, index) => (
                 <motion.div 
                   key={game.id}
-                  whileHover={{ y: -8 }}
+                  whileHover={{ y: -5 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                   className="bg-white rounded-[2rem] overflow-hidden shadow-sm border border-zinc-100 cursor-pointer group"
-                  onClick={() => setSelectedGame(game)}
+                  onClick={() => {
+                    floodHistory();
+                    setSelectedGame(game);
+                  }}
                 >
                   <div className="aspect-[16/10] relative overflow-hidden bg-zinc-100">
                     <img 
                       src={game.thumbnail} 
                       alt={game.title}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                      loading="lazy"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       referrerPolicy="no-referrer"
                       onError={(e) => {
                         e.target.onerror = null;
-                        // Use a more reliable proxy for thumbnails
                         const originalUrl = game.thumbnail;
+                        // Try wsrv.nl proxy if direct fails
                         e.target.src = `https://wsrv.nl/?url=${encodeURIComponent(originalUrl)}&w=400&h=250&fit=cover`;
                       }}
                     />
-                    <div className="absolute inset-0 bg-zinc-900/0 group-hover:bg-zinc-900/40 transition-all duration-500 flex items-center justify-center">
-                      <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center scale-0 group-hover:scale-100 transition-transform duration-500 shadow-2xl">
-                        <Search className="w-6 h-6 text-zinc-900" />
+                    <div className="absolute inset-0 bg-zinc-900/0 group-hover:bg-zinc-900/40 transition-all duration-300 flex items-center justify-center">
+                      <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center scale-0 group-hover:scale-100 transition-transform duration-300 shadow-2xl">
+                        <Search className="w-5 h-5 text-zinc-900" />
                       </div>
                     </div>
                   </div>
@@ -900,10 +973,64 @@ export default function App() {
     }
   };
 
+  const renderStealthMode = () => (
+    <div className="min-h-screen bg-white text-zinc-800 font-serif p-12 max-w-4xl mx-auto shadow-2xl my-12 border border-zinc-200">
+      <div className="flex items-center justify-between mb-8 pb-4 border-b border-zinc-200">
+        <h1 className="text-3xl font-bold text-zinc-900">Research Paper: Cognitive Development in Digital Environments</h1>
+        <div className="flex items-center gap-4 text-xs text-zinc-400">
+          <span>Last edited 2 minutes ago</span>
+          <button onClick={() => setIsStealthMode(false)} className="hover:text-zinc-900">Exit</button>
+        </div>
+      </div>
+      <div className="space-y-6 text-lg leading-relaxed text-justify">
+        <p className="font-bold">Abstract</p>
+        <p>
+          This study investigates the impact of interactive digital modules on cognitive retention and executive function in adolescent learners. 
+          Preliminary data suggests a significant correlation between gamified learning environments and increased engagement metrics.
+        </p>
+        <p className="font-bold">1. Introduction</p>
+        <p>
+          The evolution of educational technology has necessitated a reevaluation of traditional pedagogical frameworks. 
+          As digital native populations continue to expand, the integration of interactive elements into core curricula has become a subject of intense academic scrutiny.
+        </p>
+        <p>
+          Our research focuses on the "StudyFlow" methodology, which prioritizes fluid transitions between focused study sessions and cognitive stimulation modules. 
+          This approach aims to mitigate the effects of cognitive fatigue and optimize the "flow state" during complex problem-solving tasks.
+        </p>
+        <p className="font-bold">2. Methodology</p>
+        <p>
+          The experimental group was provided with access to a suite of interactive modules designed to stimulate various cognitive domains, including spatial reasoning, pattern recognition, and rapid decision-making. 
+          The control group utilized traditional static study materials.
+        </p>
+        <div className="bg-zinc-50 p-8 border border-zinc-200 rounded-lg my-8">
+          <p className="text-sm font-mono text-zinc-500 mb-4">Table 1: Cognitive Domain Mapping</p>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="font-bold">Domain</div>
+            <div className="font-bold">Module Type</div>
+            <div>Spatial Reasoning</div>
+            <div>Interactive Grid Systems</div>
+            <div>Pattern Recognition</div>
+            <div>Sequential Logic Modules</div>
+            <div>Executive Function</div>
+            <div>Rapid Response Simulators</div>
+          </div>
+        </div>
+        <p>
+          Data collection involved bi-weekly assessments of task completion rates and qualitative feedback regarding perceived mental workload. 
+          Initial findings indicate that the experimental group demonstrated a 15% improvement in sustained attention spans over a six-week period.
+        </p>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="min-h-screen bg-[#F9F9F8] text-zinc-900 font-sans selection:bg-zinc-200">
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-b border-zinc-100 z-40">
+    <div className={`min-h-screen bg-[#F9F9F8] text-zinc-900 font-sans selection:bg-zinc-200 ${isStealthMode ? 'bg-zinc-100' : ''}`}>
+      {isStealthMode ? (
+        renderStealthMode()
+      ) : (
+        <>
+          {/* Navigation */}
+          <nav className="fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-b border-zinc-100 z-40">
         <div className="max-w-7xl mx-auto px-8 h-20 flex items-center justify-between">
           <div className="flex flex-col cursor-pointer group" onClick={() => setActiveTab('dashboard')}>
             <div className="flex items-center gap-3">
@@ -918,6 +1045,13 @@ export default function App() {
           <div className="flex items-center gap-2">
             {user && (
               <>
+                <button 
+                  onClick={() => setIsStealthMode(!isStealthMode)}
+                  className={`p-3 rounded-2xl border transition-all ${isStealthMode ? 'bg-zinc-900 text-white border-zinc-900' : 'bg-zinc-50 border-zinc-100 text-zinc-400'}`}
+                  title="Toggle Stealth Mode"
+                >
+                  <FileText className="w-5 h-5" />
+                </button>
                 <button 
                   onClick={() => setIsCloaked(!isCloaked)}
                   className={`p-3 rounded-2xl border transition-all ${isCloaked ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-zinc-50 border-zinc-100 text-zinc-400'}`}
@@ -961,6 +1095,8 @@ export default function App() {
       <main className="pt-36 pb-24 px-8">
         {renderContent()}
       </main>
+        </>
+      )}
 
       {/* Game Modal */}
       <AnimatePresence>
@@ -999,6 +1135,31 @@ export default function App() {
                     Log Achievement
                   </button>
                   <button 
+                    onClick={() => {
+                      const iframe = document.querySelector('iframe[title="' + selectedGame.title + '"]');
+                      if (iframe) {
+                        if (iframe.requestFullscreen) iframe.requestFullscreen();
+                        else if (iframe.webkitRequestFullscreen) iframe.webkitRequestFullscreen();
+                        else if (iframe.msRequestFullscreen) iframe.msRequestFullscreen();
+                      }
+                    }}
+                    className="w-12 h-12 hover:bg-zinc-50 rounded-2xl flex items-center justify-center transition-all"
+                    title="Fullscreen"
+                  >
+                    <ExternalLink className="w-5 h-5 text-zinc-400" />
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setIsGameLoading(true);
+                      const iframe = document.querySelector('iframe[title="' + selectedGame.title + '"]');
+                      if (iframe) iframe.src = iframe.src;
+                    }}
+                    className="w-12 h-12 hover:bg-zinc-50 rounded-2xl flex items-center justify-center transition-all"
+                    title="Reload Game"
+                  >
+                    <Clock className="w-5 h-5 text-zinc-400" />
+                  </button>
+                  <button 
                     onClick={() => setSelectedGame(null)}
                     className="w-12 h-12 hover:bg-zinc-50 rounded-2xl flex items-center justify-center transition-all"
                   >
@@ -1021,7 +1182,7 @@ export default function App() {
                   className="w-full h-full border-none"
                   title={selectedGame.title}
                   onLoad={() => setIsGameLoading(false)}
-                  allow="fullscreen; autoplay; encrypted-media; pointer-lock"
+                  allow="fullscreen; autoplay; encrypted-media; pointer-lock; cross-origin-isolated"
                   allowFullScreen
                 />
               </div>

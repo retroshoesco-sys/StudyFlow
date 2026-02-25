@@ -26,49 +26,193 @@
   {
     "id": "slope",
     "title": "Slope",
-    "url": "https://kdata1.com/2020/05/slope/",
+    "url": "https://slope-game.github.io/",
     "thumbnail": "https://play-lh.googleusercontent.com/66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6"
   },
   {
     "id": "tetris",
     "title": "Tetris",
-    "url": "https://chvin.github.io/react-tetris/",
+    "url": "https://tetris-game.github.io/",
     "thumbnail": "https://raw.githubusercontent.com/chvin/react-tetris/master/static/logo.png"
   },
   {
     "id": "eagler12",
     "title": "Eaglercraft",
-    "url": "https://eaglercraft.com/mc/1.8.8/",
+    "url": "https://mc.deev.is/",
     "thumbnail": "https://eaglercraft.com/favicon.png"
   },
   {
     "id": "gunspin",
     "title": "Gunspin",
-    "url": "https://html5.api.gamedistribution.com/39322300062a49808381283659223126/",
+    "url": "https://gunspin-game.github.io/",
     "thumbnail": "https://img.gamedistribution.com/39322300062a49808381283659223126-512x512.jpeg"
   },
   {
     "id": "cookie-clicker",
     "title": "Cookie Clicker",
-    "url": "https://cookieclicker.ee/",
+    "url": "https://orteil.dashnet.org/cookieclicker/",
     "thumbnail": "https://orteil.dashnet.org/cookieclicker/img/cookie.png"
   },
   {
     "id": "pacman",
     "title": "Pacman",
-    "url": "https://pacman.live/play.html",
+    "url": "https://pacman-game.github.io/",
     "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/4/49/Pacman.svg"
   },
   {
     "id": "geometry-dash",
     "title": "Geometry Dash",
-    "url": "https://geometry-dash-lite.io/",
+    "url": "https://geometry-dash-lite.github.io/",
     "thumbnail": "https://geometry-dash-lite.io/favicon.ico"
   },
   {
     "id": "cut-the-rope",
     "title": "Cut the Rope",
-    "url": "https://www.cuttherope.ie/",
+    "url": "https://cuttherope-game.github.io/",
     "thumbnail": "https://www.cuttherope.ie/favicon.ico"
+  },
+  {
+    "id": "snake",
+    "title": "Snake",
+    "url": "https://snake-game.github.io/",
+    "thumbnail": "https://www.google.com/logos/fnbx/snake_arcade/v1/snake_arcade_thumbnail.png"
+  },
+  {
+    "id": "minesweeper",
+    "title": "Minesweeper",
+    "url": "https://minesweeper-game.github.io/",
+    "thumbnail": "https://minesweeper.online/img/minesweeper_logo.png"
+  },
+  {
+    "id": "chess",
+    "title": "Chess",
+    "url": "https://chess-game.github.io/",
+    "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/ChessSet.jpg/1200px-ChessSet.jpg"
+  },
+  {
+    "id": "sudoku",
+    "title": "Sudoku",
+    "url": "https://sudoku-game.github.io/",
+    "thumbnail": "https://sudoku.com/img/share.png"
+  },
+  {
+    "id": "wordle",
+    "title": "Wordle",
+    "url": "https://wordle-game.github.io/",
+    "thumbnail": "https://www.nytimes.com/games-assets/v2/metadata/wordle-apple-touch-icon.png"
+  },
+  {
+    "id": "paper-io-2",
+    "title": "Paper.io 2",
+    "url": "https://paper-io-2.github.io/",
+    "thumbnail": "https://play-lh.googleusercontent.com/66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6"
+  },
+  {
+    "id": "hole-io",
+    "title": "Hole.io",
+    "url": "https://hole-io-game.github.io/",
+    "thumbnail": "https://play-lh.googleusercontent.com/66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6"
+  },
+  {
+    "id": "crossy-road",
+    "title": "Crossy Road",
+    "url": "https://crossy-road-game.github.io/",
+    "thumbnail": "https://play-lh.googleusercontent.com/66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6"
+  },
+  {
+    "id": "temple-run-2",
+    "title": "Temple Run 2",
+    "url": "https://temple-run-2.github.io/",
+    "thumbnail": "https://play-lh.googleusercontent.com/66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6"
+  },
+  {
+    "id": "subway-surfers",
+    "title": "Subway Surfers",
+    "url": "https://subwaysurfers-game.github.io/",
+    "thumbnail": "https://play-lh.googleusercontent.com/66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6"
+  },
+  {
+    "id": "retro-bowl",
+    "title": "Retro Bowl",
+    "url": "https://retrobowl-game.github.io/",
+    "thumbnail": "https://play-lh.googleusercontent.com/66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6"
+  },
+  {
+    "id": "moto-x3m",
+    "title": "Moto X3M",
+    "url": "https://motox3m-game.github.io/",
+    "thumbnail": "https://play-lh.googleusercontent.com/66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6"
+  },
+  {
+    "id": "vex-4",
+    "title": "Vex 4",
+    "url": "https://vex4-game.github.io/",
+    "thumbnail": "https://play-lh.googleusercontent.com/66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6"
+  },
+  {
+    "id": "basketball-stars",
+    "title": "Basketball Stars",
+    "url": "https://basketballstars-6x.github.io/",
+    "thumbnail": "https://play-lh.googleusercontent.com/66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6"
+  },
+  {
+    "id": "stickman-hook",
+    "title": "Stickman Hook",
+    "url": "https://stickmanhook.io/",
+    "thumbnail": "https://play-lh.googleusercontent.com/66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6"
+  },
+  {
+    "id": "tunnel-rush",
+    "title": "Tunnel Rush",
+    "url": "https://tunnelrush.io/",
+    "thumbnail": "https://play-lh.googleusercontent.com/66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6"
+  },
+  {
+    "id": "run-3",
+    "title": "Run 3",
+    "url": "https://run3.io/",
+    "thumbnail": "https://play-lh.googleusercontent.com/66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6"
+  },
+  {
+    "id": "fireboy-watergirl-1",
+    "title": "Fireboy & Watergirl 1",
+    "url": "https://fireboywatergirl.io/fireboy-and-watergirl-1-forest-temple.html",
+    "thumbnail": "https://play-lh.googleusercontent.com/66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6"
+  },
+  {
+    "id": "vex-5",
+    "title": "Vex 5",
+    "url": "https://vex5.io/",
+    "thumbnail": "https://play-lh.googleusercontent.com/66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6"
+  },
+  {
+    "id": "tunnel-rush-2",
+    "title": "Tunnel Rush 2",
+    "url": "https://tunnelrush2.io/",
+    "thumbnail": "https://play-lh.googleusercontent.com/66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6"
+  },
+  {
+    "id": "retro-bowl-college",
+    "title": "Retro Bowl College",
+    "url": "https://retro-bowl-college.github.io/",
+    "thumbnail": "https://play-lh.googleusercontent.com/66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6"
+  },
+  {
+    "id": "temple-run",
+    "title": "Temple Run",
+    "url": "https://temple-run-game.github.io/",
+    "thumbnail": "https://play-lh.googleusercontent.com/66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6"
+  },
+  {
+    "id": "minecraft-classic",
+    "title": "Minecraft Classic",
+    "url": "https://classic.minecraft.net/",
+    "thumbnail": "https://www.minecraft.net/etc.clientlibs/minecraft/clientlibs/main/resources/favicon.ico"
+  },
+  {
+    "id": "stickman-party",
+    "title": "Stickman Party",
+    "url": "https://stickman-party.github.io/",
+    "thumbnail": "https://play-lh.googleusercontent.com/66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6_66976-b6"
   }
 ]
