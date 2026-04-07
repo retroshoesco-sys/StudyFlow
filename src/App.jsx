@@ -1,1054 +1,310 @@
-import React, { useState, useEffect } from 'react';
-import { BookOpen, Clock, MessageSquare, StickyNote, Gamepad2, X, Search, LogOut, User, Lock, ChevronRight, ExternalLink, Music, Info, Shield, FileText, Youtube, Mail } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  BookOpen, Clock, MessageSquare, StickyNote, 
+  LogOut, User, Lock, ChevronRight, ExternalLink, 
+  Music, Shield, FileText, Youtube, X, Play, Pause, RotateCcw,
+  CheckCircle2, AlertCircle, Search, Trash2, Save
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import gamesData from './data/games.json';
+import gamesData from './games.json';
 
-const API_BASE = '/api';
+// --- Constants & Mock Data ---
+const STUDY_RESOURCES = [
+  { title: "Khan Academy", url: "https://www.khanacademy.org", category: "General" },
+  { title: "Quizlet", url: "https://quizlet.com", category: "Flashcards" },
+  { title: "WolframAlpha", url: "https://www.wolframalpha.com", category: "Math/Science" },
+  { title: "Desmos", url: "https://www.desmos.com/calculator", category: "Math" }
+];
+
+const MUSIC_PRESETS = [
+  { id: 'lofi', name: 'Lofi Hip Hop', url: 'https://www.youtube.com/embed/jfKfPfyJRdk' },
+  { id: 'rain', name: 'Rainy Night', url: 'https://www.youtube.com/embed/mPZkdNFkNps' },
+  { id: 'classical', name: 'Classical Study', url: 'https://www.youtube.com/embed/4Tr0otuiQuU' }
+];
 
 export default function App() {
-  const [user, setUser] = useState(null);
-  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
+  // --- State ---
+  const [user, setUser] = useState(() => {
+    const saved = localStorage.getItem('studyflow_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [authMode, setAuthMode] = useState('login');
   const [authForm, setAuthForm] = useState({ username: '', password: '' });
-  const [authError, setAuthError] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [feedbackText, setFeedbackText] = useState('');
-  const [feedbackSubject, setFeedbackSubject] = useState('');
+  const [secretCode, setSecretCode] = useState('');
+  const [devClickCount, setDevClickCount] = useState(0);
+  const [isDeveloper, setIsDeveloper] = useState(() => {
+    return localStorage.getItem('studyflow_dev') === 'true';
+  });
+  const [feedbackForm, setFeedbackForm] = useState({ subject: '', message: '' });
   const [feedbackSent, setFeedbackSent] = useState(false);
-  const [selectedGame, setSelectedGame] = useState(null);
+  
+  // Features
+  const [notes, setNotes] = useState(() => {
+    const saved = localStorage.getItem('studyflow_notes');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [currentNote, setCurrentNote] = useState({ title: '', content: '' });
   const [timer, setTimer] = useState(25 * 60);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
-  const [notes, setNotes] = useState([]);
-  const [currentNote, setCurrentNote] = useState({ id: null, title: '', content: '' });
-  const [stats, setStats] = useState({ streak: 0, daily_goal_count: 0 });
-  const [ytUrl, setYtUrl] = useState('');
-  const [currentYtId, setCurrentYtId] = useState('');
-  const [isGameLoading, setIsGameLoading] = useState(true);
-  const [gameProgress, setGameProgress] = useState([]);
-  const [gameStartTime, setGameStartTime] = useState(null);
-  const [isCloaked, setIsCloaked] = useState(false);
+  const [activeMusic, setActiveMusic] = useState(null);
   const [isStealthMode, setIsStealthMode] = useState(false);
-  const [gameSearch, setGameSearch] = useState('');
-  const lastGameRef = React.useRef(null);
+  const [isCloaked, setIsCloaked] = useState(false);
+  const [stats, setStats] = useState({ streak: 5, sessions: 12, focusTime: '14h' });
 
-  // Deledao Protection: Panic Key (\ or `)
+  // --- Effects ---
+  
+  // Persist Dev Mode
+  useEffect(() => {
+    localStorage.setItem('studyflow_dev', isDeveloper);
+  }, [isDeveloper]);
+
+  // Secret Code Detection
+  useEffect(() => {
+    const normalized = secretCode.replace(/\s/g, '').toLowerCase();
+    if (normalized.includes('ayansatishmadethis')) {
+      if (!isDeveloper) {
+        setIsDeveloper(true);
+        setActiveTab('admin');
+        alert('Developer Mode Unlocked! Redirecting to Admin Console...');
+      }
+      setSecretCode('');
+    }
+  }, [secretCode, isDeveloper]);
+
+  // Panic Key (\) and Global Key Buffer
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === '\\' || e.key === '`') {
-        window.location.href = 'https://classroom.google.com';
+      if (e.key === '\\') window.location.href = 'https://classroom.google.com';
+      
+      if (e.key.length === 1) {
+        setSecretCode(prev => (prev + e.key.toLowerCase()).slice(-50));
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Deledao Protection: Tab Visibility Cloaking
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        document.title = 'Google Classroom';
-        const link = document.querySelector("link[rel~='icon']");
-        if (link) link.href = 'https://ssl.gstatic.com/classroom/favicon.png';
-      } else if (!isCloaked) {
-        document.title = 'StudyFlow';
-        const link = document.querySelector("link[rel~='icon']");
-        if (link) link.href = 'https://ssl.gstatic.com/classroom/favicon.png';
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [isCloaked]);
-
-  // Deledao Protection: History Flooding
-  const floodHistory = () => {
-    if (user) {
-      for (let i = 0; i < 5; i++) {
-        window.history.pushState(null, '', window.location.href + '#' + Math.random().toString(36).substring(7));
-      }
-    }
-  };
-
-  useEffect(() => {
-    floodHistory();
-    const interval = setInterval(floodHistory, 60000); // Flood every minute
-    return () => clearInterval(interval);
-  }, [user]);
-
-  // Deledao Protection: Tab Cloaking
+  // Tab Cloaking
   useEffect(() => {
     const link = document.querySelector("link[rel~='icon']") || document.createElement('link');
     link.rel = 'icon';
-    
     if (isCloaked || isStealthMode) {
       document.title = 'Google Classroom';
       link.href = 'https://ssl.gstatic.com/classroom/favicon.png';
     } else {
       document.title = 'StudyFlow';
-      link.href = 'https://ssl.gstatic.com/classroom/favicon.png'; // Default to classroom for safety
+      link.href = 'https://ssl.gstatic.com/classroom/favicon.png';
     }
     document.getElementsByTagName('head')[0].appendChild(link);
   }, [isCloaked, isStealthMode]);
 
-  // Deledao Protection: About:Blank Cloaking
-  const openAboutBlank = () => {
-    try {
-      const win = window.open('about:blank', '_blank');
-      if (!win) {
-        alert('Popup blocked! Please allow popups for this site.');
-        return;
-      }
-      const doc = win.document;
-      const iframe = doc.createElement('iframe');
-      iframe.style.position = 'fixed';
-      iframe.style.top = '0';
-      iframe.style.left = '0';
-      iframe.style.bottom = '0';
-      iframe.style.right = '0';
-      iframe.style.width = '100%';
-      iframe.style.height = '100%';
-      iframe.style.border = 'none';
-      iframe.style.margin = '0';
-      iframe.style.padding = '0';
-      iframe.style.overflow = 'hidden';
-      iframe.style.zIndex = '999999';
-      iframe.src = window.location.href;
-      
-      doc.body.style.margin = '0';
-      doc.body.style.height = '100vh';
-      doc.body.appendChild(iframe);
-      
-      // Close original tab or redirect it
-      window.location.replace('https://google.com');
-    } catch (e) {
-      console.error('About:blank failed', e);
-    }
-  };
-
-  // Reset loading state when game changes
-  useEffect(() => {
-    if (selectedGame) {
-      setIsGameLoading(true);
-      setGameStartTime(Date.now());
-      lastGameRef.current = selectedGame;
-    } else if (gameStartTime && lastGameRef.current) {
-      // Game closed, save progress
-      const playTimeSeconds = Math.floor((Date.now() - gameStartTime) / 1000);
-      if (playTimeSeconds > 5) { // Only save if played for more than 5 seconds
-        saveGameProgress(lastGameRef.current.id, lastGameRef.current.title, playTimeSeconds);
-      }
-      setGameStartTime(null);
-      lastGameRef.current = null;
-    }
-  }, [selectedGame]);
-
-  // Load user from localStorage
-  useEffect(() => {
-    const savedUser = localStorage.getItem('user');
-    const token = localStorage.getItem('token');
-    if (savedUser && token) {
-      const parsedUser = JSON.parse(savedUser);
-      setUser(parsedUser);
-      setStats({ streak: parsedUser.streak || 0, daily_goal_count: parsedUser.daily_goal_count || 0 });
-      fetchNotes(token);
-      fetchGameProgress(token);
-    }
-  }, []);
-
-  // Secret code logic
-  useEffect(() => {
-    if (feedbackText.toLowerCase().includes('ayansatishmadethis')) {
-      setActiveTab('games');
-      setFeedbackText('');
-    }
-  }, [feedbackText]);
-
-  // Timer logic
+  // Timer Logic
   useEffect(() => {
     let interval;
     if (isTimerRunning && timer > 0) {
-      interval = setInterval(() => {
-        setTimer((prev) => prev - 1);
-      }, 1000);
+      interval = setInterval(() => setTimer(t => t - 1), 1000);
     } else if (timer === 0) {
       setIsTimerRunning(false);
-      if (user) handleSessionComplete();
+      alert("Session complete! Take a break.");
     }
     return () => clearInterval(interval);
   }, [isTimerRunning, timer]);
 
-  const fetchNotes = async (token) => {
-    try {
-      const res = await fetch(`${API_BASE}/notes`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setNotes(data);
-      }
-    } catch (e) {
-      console.error('Failed to fetch notes');
-    }
-  };
-
-  const fetchGameProgress = async (token) => {
-    try {
-      const res = await fetch(`${API_BASE}/game-progress`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setGameProgress(data);
-      }
-    } catch (e) {
-      console.error('Failed to fetch game progress');
-    }
-  };
-
-  const saveGameProgress = async (gameId, gameTitle, playTime, score = 'N/A') => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-    try {
-      await fetch(`${API_BASE}/game-progress`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          game_id: gameId,
-          game_title: gameTitle,
-          score: score,
-          play_time: playTime
-        })
-      });
-      fetchGameProgress(token);
-    } catch (e) {
-      console.error('Failed to save game progress');
-    }
-  };
-
-  const handleAuth = async (e) => {
+  // --- Handlers ---
+  const handleAuth = (e) => {
     e.preventDefault();
-    setAuthError('');
-    const endpoint = authMode === 'login' ? '/auth/login' : '/auth/register';
-    try {
-      const res = await fetch(`${API_BASE}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(authForm)
-      });
-      const data = await res.json();
-      if (res.ok) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        setUser(data.user);
-        setStats({ streak: data.user.streak, daily_goal_count: data.user.daily_goal_count });
-        fetchNotes(data.token);
-      } else {
-        setAuthError(data.error || 'Authentication failed');
-      }
-    } catch (e) {
-      setAuthError('Network error. Please try again.');
+    const userData = { username: authForm.username, id: Date.now() };
+    localStorage.setItem('studyflow_user', JSON.stringify(userData));
+    setUser(userData);
+  };
+
+  const handleFeedbackSubmit = (e) => {
+    if (e) e.preventDefault();
+    
+    const combined = (feedbackForm.subject + ' ' + feedbackForm.message).toLowerCase();
+    if (combined.includes('ayansatishmadethis')) {
+      setIsDeveloper(true);
+      setActiveTab('admin');
+      alert('Developer Mode Unlocked! Redirecting to Admin Console...');
     }
+    
+    setFeedbackSent(true);
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    localStorage.removeItem('studyflow_user');
     setUser(null);
-    setNotes([]);
     setActiveTab('dashboard');
   };
 
-  const saveNote = async () => {
-    if (!user) return;
-    const token = localStorage.getItem('token');
-    const method = currentNote.id ? 'PUT' : 'POST';
-    const url = currentNote.id ? `${API_BASE}/notes/${currentNote.id}` : `${API_BASE}/notes`;
-    
-    try {
-      const res = await fetch(url, {
-        method,
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ title: currentNote.title, content: currentNote.content })
-      });
-      if (res.ok) {
-        fetchNotes(token);
-        if (!currentNote.id) {
-          const data = await res.json();
-          setCurrentNote(prev => ({ ...prev, id: data.id }));
-        }
-      }
-    } catch (e) {
-      console.error('Failed to save note');
-    }
+  const saveNote = () => {
+    if (!currentNote.title) return;
+    const newNotes = [{ ...currentNote, id: Date.now() }, ...notes];
+    setNotes(newNotes);
+    localStorage.setItem('studyflow_notes', JSON.stringify(newNotes));
+    setCurrentNote({ title: '', content: '' });
   };
 
-  const handleSessionComplete = async () => {
-    const token = localStorage.getItem('token');
-    try {
-      const res = await fetch(`${API_BASE}/stats/complete-session`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setStats(data);
-      }
-    } catch (e) {
-      console.error('Failed to update stats');
-    }
-  };
-
-  const handleFeedbackSubmit = async (e) => {
-    e.preventDefault();
-    if (!feedbackText || !feedbackSubject) return;
-    
-    const token = localStorage.getItem('token');
-    try {
-      const res = await fetch(`${API_BASE}/feedback`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ subject: feedbackSubject, message: feedbackText })
-      });
-      if (res.ok) {
-        setFeedbackSent(true);
-        setFeedbackText('');
-        setFeedbackSubject('');
-        setTimeout(() => setFeedbackSent(false), 5000);
-      }
-    } catch (e) {
-      alert('Failed to send feedback');
-    }
-  };
-
-  const handleYoutubeSubmit = (e) => {
-    e.preventDefault();
-    const match = ytUrl.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-    if (match) {
-      setCurrentYtId(match[1]);
-      setYtUrl('');
-    } else {
-      alert('Invalid YouTube URL');
-    }
+  const deleteNote = (id) => {
+    const newNotes = notes.filter(n => n.id !== id);
+    setNotes(newNotes);
+    localStorage.setItem('studyflow_notes', JSON.stringify(newNotes));
   };
 
   const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  const renderAuth = () => (
-    <div className="max-w-md mx-auto mt-20">
-      <div className="bg-white p-8 rounded-3xl shadow-xl border border-zinc-100">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-zinc-900 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <User className="text-white w-8 h-8" />
+  // --- Render Helpers ---
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#F9F9F8] flex items-center justify-center p-8">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-md bg-white p-12 rounded-[3rem] shadow-2xl border border-zinc-100"
+        >
+          <div className="flex items-center gap-3 mb-12 justify-center">
+            <div className="w-12 h-12 bg-zinc-900 rounded-2xl flex items-center justify-center">
+              <span className="text-white font-black text-2xl">S</span>
+            </div>
+            <span className="font-black tracking-tighter text-3xl">StudyFlow</span>
           </div>
-          <h2 className="text-2xl font-bold">{authMode === 'login' ? 'Welcome Back' : 'Create Account'}</h2>
-          <p className="text-zinc-500 text-sm mt-2">Join StudyFlow to sync your progress privately.</p>
-        </div>
-        <form onSubmit={handleAuth} className="space-y-4">
-          {authError && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="bg-red-50 text-red-600 p-3 rounded-xl text-xs font-bold border border-red-100"
-            >
-              {authError}
-            </motion.div>
-          )}
-          <div>
-            <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">Username</label>
-            <input 
-              type="text" 
-              required
-              className="w-full px-4 py-3 rounded-xl border border-zinc-100 outline-none focus:ring-2 focus:ring-zinc-900/5 transition-all"
-              value={authForm.username}
-              onChange={e => setAuthForm({ ...authForm, username: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">Password</label>
-            <input 
-              type="password" 
-              required
-              className="w-full px-4 py-3 rounded-xl border border-zinc-100 outline-none focus:ring-2 focus:ring-zinc-900/5 transition-all"
-              value={authForm.password}
-              onChange={e => setAuthForm({ ...authForm, password: e.target.value })}
-            />
-          </div>
-          <button type="submit" className="w-full py-4 bg-zinc-900 text-white rounded-xl font-bold hover:bg-zinc-800 transition-all shadow-lg shadow-zinc-900/10">
-            {authMode === 'login' ? 'Sign In' : 'Sign Up'}
-          </button>
-        </form>
-        <div className="mt-6 text-center">
+          
+          <form onSubmit={handleAuth} className="space-y-6">
+            <div>
+              <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Username</label>
+              <input 
+                type="text" 
+                required
+                className="w-full px-6 py-4 bg-zinc-50 border border-zinc-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-zinc-900/5 transition-all"
+                value={authForm.username}
+                onChange={e => setAuthForm({...authForm, username: e.target.value})}
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Password</label>
+              <input 
+                type="password" 
+                required
+                className="w-full px-6 py-4 bg-zinc-50 border border-zinc-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-zinc-900/5 transition-all"
+                value={authForm.password}
+                onChange={e => setAuthForm({...authForm, password: e.target.value})}
+              />
+            </div>
+            <button className="w-full py-5 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all shadow-lg shadow-zinc-900/20">
+              {authMode === 'login' ? 'Sign In' : 'Create Account'}
+            </button>
+          </form>
+          
           <button 
             onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
-            className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors"
+            className="w-full mt-8 text-xs font-bold text-zinc-400 hover:text-zinc-900 transition-colors"
           >
             {authMode === 'login' ? "Don't have an account? Register" : "Already have an account? Login"}
           </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderContent = () => {
-    if (!user) return renderAuth();
-
-    switch (activeTab) {
-      case 'dashboard':
-        return (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="max-w-4xl mx-auto space-y-8"
-          >
-            <div className="bg-white p-12 rounded-[2.5rem] shadow-sm border border-zinc-100 text-center relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-1 bg-zinc-900/5" />
-              <h2 className="text-sm font-bold text-zinc-400 uppercase tracking-[0.2em] mb-6">Deep Work Session</h2>
-              <div className="text-9xl font-light tracking-tighter text-zinc-900 mb-10 font-mono">
-                {formatTime(timer)}
-              </div>
-              <div className="flex justify-center gap-4">
-                <button 
-                  onClick={() => setIsTimerRunning(!isTimerRunning)}
-                  className="px-10 py-4 bg-zinc-900 text-white rounded-2xl font-bold hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-zinc-900/20"
-                >
-                  {isTimerRunning ? 'Pause Session' : 'Start Focus'}
-                </button>
-                <button 
-                  onClick={() => { setTimer(25 * 60); setIsTimerRunning(false); }}
-                  className="px-10 py-4 border border-zinc-200 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-50 transition-all"
-                >
-                  Reset
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white p-8 rounded-3xl shadow-sm border border-zinc-100">
-                <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center mb-6">
-                  <Clock className="w-6 h-6 text-emerald-600" />
-                </div>
-                <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Daily Goal</h3>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold">{stats.daily_goal_count}</span>
-                  <span className="text-zinc-400 text-sm">/ 4 sessions</span>
-                </div>
-                <div className="mt-4 h-2 bg-zinc-100 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-emerald-500 transition-all duration-500" 
-                    style={{ width: `${Math.min((stats.daily_goal_count / 4) * 100, 100)}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="bg-white p-8 rounded-3xl shadow-sm border border-zinc-100">
-                <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center mb-6">
-                  <User className="w-6 h-6 text-orange-600" />
-                </div>
-                <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Current Streak</h3>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold">{stats.streak}</span>
-                  <span className="text-zinc-400 text-sm">days</span>
-                </div>
-                <p className="text-xs text-zinc-400 mt-4">Keep it up, {user.username}!</p>
-              </div>
-
-              <div className="bg-white p-8 rounded-3xl shadow-sm border border-zinc-100">
-                <div className="w-12 h-12 bg-zinc-900 rounded-2xl flex items-center justify-center mb-6">
-                  <Shield className="w-6 h-6 text-white" />
-                </div>
-                <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">History Guard</h3>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-zinc-900">Active Protection</span>
-                  <button 
-                    onClick={floodHistory}
-                    className="px-4 py-2 bg-zinc-900 text-white rounded-xl text-xs font-bold hover:bg-zinc-800 transition-all"
-                  >
-                    Flood History
-                  </button>
-                </div>
-                <p className="text-[10px] text-zinc-400 mt-4 font-bold uppercase tracking-widest">Protects against history tracking</p>
-              </div>
-            </div>
-
-            {gameProgress.length > 0 && (
-              <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-zinc-100">
-                <div className="flex items-center justify-between mb-8">
-                  <h3 className="text-xl font-bold">Cognitive Module Progress</h3>
-                  <button onClick={() => setActiveTab('games')} className="text-sm font-bold text-zinc-400 hover:text-zinc-900 transition-colors">Launch Modules</button>
-                </div>
-                <div className="space-y-4">
-                  {gameProgress.map((p) => (
-                    <div key={p.game_id} className="flex items-center justify-between p-4 bg-zinc-50 rounded-2xl">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                          <Gamepad2 className="w-5 h-5 text-zinc-400" />
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-sm">{p.game_title}</h4>
-                          <p className="text-[10px] text-zinc-400 uppercase tracking-widest">
-                            Total Playtime: {Math.floor(p.play_time / 60)}m {p.play_time % 60}s
-                            {p.score !== 'N/A' && ` • Best: ${p.score}`}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs font-bold text-zinc-900">Active</p>
-                        <p className="text-[10px] text-zinc-400">Last played: {new Date(p.updated_at).toLocaleDateString()}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </motion.div>
-        );
-      case 'notes':
-        return (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8 h-[700px]"
-          >
-            <div className="md:col-span-1 bg-white rounded-3xl border border-zinc-100 overflow-hidden flex flex-col">
-              <div className="p-4 border-b border-zinc-50 flex justify-between items-center">
-                <h3 className="font-bold text-sm text-zinc-400 uppercase tracking-wider">My Notes</h3>
-                <button 
-                  onClick={() => setCurrentNote({ id: null, title: '', content: '' })}
-                  className="p-1 hover:bg-zinc-100 rounded-lg transition-colors"
-                >
-                  <Search className="w-4 h-4 rotate-45" />
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                {notes.map(note => (
-                  <button 
-                    key={note.id}
-                    onClick={() => setCurrentNote(note)}
-                    className={`w-full text-left p-4 rounded-2xl transition-all ${currentNote.id === note.id ? 'bg-zinc-900 text-white shadow-lg' : 'hover:bg-zinc-50'}`}
-                  >
-                    <h4 className="font-bold truncate">{note.title || 'Untitled Note'}</h4>
-                    <p className={`text-xs mt-1 truncate ${currentNote.id === note.id ? 'text-zinc-400' : 'text-zinc-500'}`}>
-                      {note.content || 'No content...'}
-                    </p>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="md:col-span-3 bg-white p-10 rounded-[2.5rem] shadow-sm border border-zinc-100 flex flex-col">
-              <input 
-                type="text" 
-                placeholder="Note Title..." 
-                className="text-3xl font-bold mb-6 outline-none border-none placeholder:text-zinc-200"
-                value={currentNote.title}
-                onChange={e => setCurrentNote({ ...currentNote, title: e.target.value })}
-                onBlur={saveNote}
-              />
-              <textarea 
-                className="flex-1 resize-none outline-none text-zinc-700 leading-relaxed text-lg placeholder:text-zinc-200"
-                placeholder="Start typing your study notes here..."
-                value={currentNote.content}
-                onChange={e => setCurrentNote({ ...currentNote, content: e.target.value })}
-                onBlur={saveNote}
-              />
-              <div className="mt-4 pt-4 border-t border-zinc-50 flex justify-between items-center text-xs text-zinc-400">
-                <span>Auto-saving enabled</span>
-                <span>{currentNote.content.length} characters</span>
-              </div>
-            </div>
-          </motion.div>
-        );
-      case 'resources':
-        return (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="max-w-5xl mx-auto space-y-12"
-          >
-            <div className="text-center">
-              <h2 className="text-4xl font-bold mb-4">Academic Resources</h2>
-              <p className="text-zinc-500">Curated links to help you excel in your studies.</p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <ResourceSection 
-                title="Research & Libraries"
-                links={[
-                  { name: 'Google Scholar', url: 'https://scholar.google.com', desc: 'Search across a wide range of academic literature.' },
-                  { name: 'JSTOR', url: 'https://www.jstor.org', desc: 'Digital library for scholars, researchers, and students.' },
-                  { name: 'Project Gutenberg', url: 'https://www.gutenberg.org', desc: 'Over 70,000 free eBooks.' },
-                  { name: 'Internet Archive', url: 'https://archive.org', desc: 'Universal access to all knowledge.' }
-                ]}
-              />
-              <ResourceSection 
-                title="Learning Platforms"
-                links={[
-                  { name: 'Khan Academy', url: 'https://www.khanacademy.org', desc: 'Free online courses, lessons & practice.' },
-                  { name: 'Coursera', url: 'https://www.coursera.org', desc: 'Learn without limits from world-class universities.' },
-                  { name: 'edX', url: 'https://www.edx.org', desc: 'Accelerate your future with 4000+ courses.' },
-                  { name: 'MIT OpenCourseWare', url: 'https://ocw.mit.edu', desc: 'Free lecture notes, exams, and videos from MIT.' }
-                ]}
-              />
-              <ResourceSection 
-                title="Writing & Citation"
-                links={[
-                  { name: 'Purdue OWL', url: 'https://owl.purdue.edu', desc: 'The Online Writing Lab at Purdue University.' },
-                  { name: 'Zotero', url: 'https://www.zotero.org', desc: 'Your personal research assistant.' },
-                  { name: 'Grammarly', url: 'https://www.grammarly.com', desc: 'AI-powered writing assistant.' },
-                  { name: 'Citation Machine', url: 'https://www.citationmachine.net', desc: 'Generate citations in various formats.' }
-                ]}
-              />
-              <ResourceSection 
-                title="Productivity Tools"
-                links={[
-                  { name: 'Notion', url: 'https://www.notion.so', desc: 'The all-in-one workspace for your notes.' },
-                  { name: 'Forest', url: 'https://www.forestapp.cc', desc: 'Stay focused, be present.' },
-                  { name: 'Anki', url: 'https://apps.ankiweb.net', desc: 'Powerful, intelligent flashcards.' },
-                  { name: 'WolframAlpha', url: 'https://www.wolframalpha.com', desc: 'Computational intelligence engine.' }
-                ]}
-              />
-            </div>
-          </motion.div>
-        );
-      case 'feedback':
-        return (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="max-w-2xl mx-auto"
-          >
-            <div className="bg-white p-12 rounded-[2.5rem] shadow-sm border border-zinc-100">
-              <h2 className="text-3xl font-bold mb-2">Help us improve</h2>
-              <p className="text-zinc-500 mb-8">Your feedback helps us build a better study environment for everyone.</p>
-              
-              {feedbackSent ? (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="bg-emerald-50 border border-emerald-100 p-8 rounded-3xl text-center"
-                >
-                  <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Shield className="text-white w-8 h-8" />
-                  </div>
-                  <h3 className="text-xl font-bold text-emerald-900">Feedback Sent!</h3>
-                  <p className="text-emerald-600 mt-2">Thank you for your message. We'll review it shortly.</p>
-                  <button 
-                    onClick={() => setFeedbackSent(false)}
-                    className="mt-6 text-sm font-bold text-emerald-700 hover:underline"
-                  >
-                    Send another message
-                  </button>
-                </motion.div>
-              ) : (
-                <form onSubmit={handleFeedbackSubmit} className="space-y-6">
-                  <div>
-                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2">Subject</label>
-                    <input 
-                      type="text" 
-                      required
-                      value={feedbackSubject}
-                      onChange={(e) => setFeedbackSubject(e.target.value)}
-                      className="w-full px-6 py-4 rounded-2xl border border-zinc-100 outline-none focus:ring-4 focus:ring-zinc-900/5 transition-all" 
-                      placeholder="e.g., Feature Request" 
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2">Message</label>
-                    <textarea 
-                      required
-                      value={feedbackText}
-                      onChange={(e) => setFeedbackText(e.target.value)}
-                      className="w-full h-48 px-6 py-4 rounded-2xl border border-zinc-100 outline-none focus:ring-4 focus:ring-zinc-900/5 transition-all resize-none" 
-                      placeholder="Tell us what's on your mind..."
-                    />
-                  </div>
-                  <button 
-                    type="submit"
-                    className="w-full py-5 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all shadow-xl shadow-zinc-900/20"
-                  >
-                    Submit Feedback
-                  </button>
-                  <div className="text-center">
-                    <p className="text-xs text-zinc-400">Or email us directly at:</p>
-                    <a href="mailto:retroshoesco@gmail.com" className="text-xs font-bold text-zinc-900 hover:underline">retroshoesco@gmail.com</a>
-                  </div>
-                </form>
-              )}
-            </div>
-          </motion.div>
-        );
-      case 'games':
-        return (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="max-w-6xl mx-auto"
-          >
-            <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 gap-6">
-              <div>
-                <h2 className="text-4xl font-bold text-zinc-900">Cognitive Modules</h2>
-                <p className="text-zinc-500 mt-2">Supplementary interactive exercises for mental stimulation.</p>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="relative">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" />
-                  <input 
-                    type="text"
-                    placeholder="Search modules..."
-                    value={gameSearch}
-                    className="pl-12 pr-6 py-3 bg-white border border-zinc-100 rounded-2xl outline-none focus:ring-4 focus:ring-zinc-900/5 transition-all w-64"
-                    onChange={(e) => setGameSearch(e.target.value)}
-                  />
-                </div>
-                <button 
-                  onClick={() => setActiveTab('dashboard')}
-                  className="p-3 hover:bg-white rounded-2xl border border-transparent hover:border-zinc-100 transition-all"
-                >
-                  <X className="w-8 h-8 text-zinc-400" />
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-              {gamesData
-                .filter(game => game.title.toLowerCase().includes(gameSearch.toLowerCase()))
-                .map((game, index) => (
-                <motion.div 
-                  key={game.id}
-                  whileHover={{ y: -5 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                  className="bg-white rounded-[2rem] overflow-hidden shadow-sm border border-zinc-100 cursor-pointer group"
-                  onClick={() => {
-                    floodHistory();
-                    setSelectedGame(game);
-                  }}
-                >
-                  <div className="aspect-[16/10] relative overflow-hidden bg-zinc-100">
-                    <img 
-                      src={game.thumbnail} 
-                      alt={game.title}
-                      loading="lazy"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      referrerPolicy="no-referrer"
-                      onError={(e) => {
-                        e.target.onerror = null;
-                        const originalUrl = game.thumbnail;
-                        // Try wsrv.nl proxy if direct fails
-                        e.target.src = `https://wsrv.nl/?url=${encodeURIComponent(originalUrl)}&w=400&h=250&fit=cover`;
-                      }}
-                    />
-                    <div className="absolute inset-0 bg-zinc-900/0 group-hover:bg-zinc-900/40 transition-all duration-300 flex items-center justify-center">
-                      <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center scale-0 group-hover:scale-100 transition-transform duration-300 shadow-2xl">
-                        <Search className="w-5 h-5 text-zinc-900" />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="p-8">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="px-2 py-1 bg-zinc-100 text-[10px] font-bold text-zinc-500 rounded-md uppercase tracking-widest">Module {index + 1}</span>
-                    </div>
-                    <h3 className="text-xl font-bold text-zinc-900">{game.title}</h3>
-                    <p className="text-sm text-zinc-400 mt-2">Interactive Study Aid</p>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-        );
-      case 'music':
-        return (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="max-w-4xl mx-auto space-y-8"
-          >
-            <div className="bg-white p-12 rounded-[2.5rem] shadow-sm border border-zinc-100">
-              <div className="flex items-center gap-4 mb-8">
-                <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center">
-                  <Music className="w-6 h-6 text-indigo-600" />
-                </div>
-                <div>
-                  <h2 className="text-3xl font-bold">Study Music</h2>
-                  <p className="text-zinc-500">Focus-enhancing background audio.</p>
-                </div>
-              </div>
-
-              <form onSubmit={handleYoutubeSubmit} className="mb-12">
-                <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-3">YouTube Audio Link</label>
-                <div className="flex gap-3">
-                  <div className="relative flex-1">
-                    <Youtube className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-300" />
-                    <input 
-                      type="text" 
-                      placeholder="Paste YouTube URL here..." 
-                      className="w-full pl-12 pr-6 py-4 rounded-2xl border border-zinc-100 outline-none focus:ring-4 focus:ring-indigo-900/5 transition-all"
-                      value={ytUrl}
-                      onChange={e => setYtUrl(e.target.value)}
-                    />
-                  </div>
-                  <button className="px-8 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all">
-                    Play
-                  </button>
-                </div>
-              </form>
-
-              {currentYtId && (
-                <div className="bg-zinc-900 rounded-3xl overflow-hidden aspect-video relative group">
-                  <iframe 
-                    src={`https://www.youtube.com/embed/${currentYtId}?autoplay=1&loop=1&playlist=${currentYtId}`}
-                    className="w-full h-full border-none"
-                    allow="autoplay; encrypted-media"
-                    allowFullScreen
-                  />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                    <p className="text-white font-bold text-sm">Background Audio Active</p>
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
-                <button 
-                  onClick={() => setCurrentYtId('jfKfPfyJRdk')}
-                  className="p-6 bg-zinc-50 rounded-2xl text-left hover:bg-zinc-100 transition-all border border-transparent hover:border-zinc-200"
-                >
-                  <h4 className="font-bold">Lofi Girl - Radio</h4>
-                  <p className="text-xs text-zinc-400 mt-1">Beats to relax/study to</p>
-                </button>
-                <button 
-                  onClick={() => setCurrentYtId('5qap5aO4i9A')}
-                  className="p-6 bg-zinc-50 rounded-2xl text-left hover:bg-zinc-100 transition-all border border-transparent hover:border-zinc-200"
-                >
-                  <h4 className="font-bold">Lofi Hip Hop Radio</h4>
-                  <p className="text-xs text-zinc-400 mt-1">Beats to sleep/chill to</p>
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        );
-      case 'credits':
-        return (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="max-w-2xl mx-auto"
-          >
-            <div className="bg-white p-12 rounded-[2.5rem] shadow-sm border border-zinc-100 text-center">
-              <div className="w-20 h-20 bg-zinc-900 rounded-3xl flex items-center justify-center mx-auto mb-8">
-                <Info className="text-white w-10 h-10" />
-              </div>
-              <h2 className="text-4xl font-black mb-4 tracking-tighter">Project Credits</h2>
-              <p className="text-red-500 font-bold mb-4 font-tamil">"நீ ஒரு முட்டாள்"</p>
-              <p className="text-zinc-500 mb-12">Every single person who put work into this project.</p>
-              
-              <div className="space-y-6">
-                {[
-                  'Lead Developer', 'Product Designer', 'Backend Engineer', 
-                  'UI/UX Specialist', 'Database Architect', 'Security Analyst',
-                  'Quality Assurance', 'Project Manager', 'Documentation'
-                ].map(role => (
-                  <div key={role} className="flex items-center justify-between p-6 bg-zinc-50 rounded-2xl border border-zinc-100">
-                    <span className="font-bold text-zinc-400 uppercase tracking-widest text-xs">{role}</span>
-                    <span className="font-black text-zinc-900 font-tamil">என் பெயரை வெளியிட முடியாது</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </motion.div>
-        );
-      case 'privacy':
-        return (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="max-w-4xl mx-auto"
-          >
-            <div className="bg-white p-16 rounded-[3rem] shadow-sm border border-zinc-100">
-              <div className="flex items-center gap-4 mb-12">
-                <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center">
-                  <Shield className="w-6 h-6 text-emerald-600" />
-                </div>
-                <h2 className="text-4xl font-black tracking-tighter">Privacy Policy</h2>
-              </div>
-              <div className="prose prose-zinc max-w-none space-y-8 text-zinc-600 leading-relaxed">
-                <section>
-                  <h3 className="text-xl font-bold text-zinc-900 mb-4">1. Data Collection</h3>
-                  <p>We collect minimal data required to provide our services. This includes your username, encrypted password, and study statistics (streaks, goal counts). We do not sell your data to third parties.</p>
-                </section>
-                <section>
-                  <h3 className="text-xl font-bold text-zinc-900 mb-4">2. Local Storage</h3>
-                  <p>We use browser local storage to keep you logged in and maintain your session preferences. This data remains on your device.</p>
-                </section>
-                <section>
-                  <h3 className="text-xl font-bold text-zinc-900 mb-4">3. Security</h3>
-                  <p>Your passwords are encrypted using industry-standard hashing algorithms (bcrypt). Your study notes are stored privately in our secure database and are only accessible to you.</p>
-                </section>
-                <section>
-                  <h3 className="text-xl font-bold text-zinc-900 mb-4">4. Third-Party Links</h3>
-                  <p>Our resources page contains links to external websites. We are not responsible for the privacy practices or content of these external sites.</p>
-                </section>
-              </div>
-            </div>
-          </motion.div>
-        );
-      case 'terms':
-        return (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="max-w-4xl mx-auto"
-          >
-            <div className="bg-white p-16 rounded-[3rem] shadow-sm border border-zinc-100">
-              <div className="flex items-center gap-4 mb-12">
-                <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center">
-                  <FileText className="w-6 h-6 text-blue-600" />
-                </div>
-                <h2 className="text-4xl font-black tracking-tighter">Terms of Service</h2>
-              </div>
-              <div className="prose prose-zinc max-w-none space-y-8 text-zinc-600 leading-relaxed">
-                <section>
-                  <h3 className="text-xl font-bold text-zinc-900 mb-4">1. Acceptance of Terms</h3>
-                  <p>By accessing StudyFlow, you agree to be bound by these terms. If you do not agree, please do not use the application.</p>
-                </section>
-                <section>
-                  <h3 className="text-xl font-bold text-zinc-900 mb-4">2. User Accounts</h3>
-                  <p>You are responsible for maintaining the confidentiality of your account credentials. Any activity under your account is your responsibility.</p>
-                </section>
-                <section>
-                  <h3 className="text-xl font-bold text-zinc-900 mb-4">3. Prohibited Use</h3>
-                  <p>You may not use StudyFlow for any illegal activities or to distribute malicious software. We reserve the right to terminate accounts that violate these terms.</p>
-                </section>
-                <section>
-                  <h3 className="text-xl font-bold text-zinc-900 mb-4">4. Disclaimer</h3>
-                  <p>StudyFlow is provided "as is" without warranties of any kind. We are not liable for any data loss or productivity issues resulting from the use of this tool.</p>
-                </section>
-              </div>
-            </div>
-          </motion.div>
-        );
-      case 'support':
-        return (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="max-w-2xl mx-auto"
-          >
-            <div className="bg-white p-16 rounded-[3rem] shadow-sm border border-zinc-100 text-center">
-              <div className="w-20 h-20 bg-zinc-900 rounded-3xl flex items-center justify-center mx-auto mb-8">
-                <Mail className="text-white w-10 h-10" />
-              </div>
-              <h2 className="text-4xl font-black mb-4 tracking-tighter">Get Support</h2>
-              <p className="text-zinc-500 mb-12">Need help with StudyFlow? Our team is here to assist you.</p>
-              
-              <div className="bg-zinc-50 p-8 rounded-3xl border border-zinc-100">
-                <p className="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-2">Email Us At</p>
-                <a 
-                  href="mailto:retroshoesco@gmail.com" 
-                  className="text-2xl font-black text-zinc-900 hover:text-zinc-600 transition-colors"
-                >
-                  retroshoesco@gmail.com
-                </a>
-              </div>
-              
+          
+          {isDeveloper && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="mt-8 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-center"
+            >
+              <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center justify-center gap-2">
+                <Lock className="w-3 h-3" /> Developer Mode Active
+              </p>
               <button 
-                onClick={() => setActiveTab('feedback')}
-                className="mt-8 text-sm font-bold text-zinc-400 hover:text-zinc-900 transition-colors"
+                onClick={() => setIsDeveloper(false)}
+                className="mt-2 text-[8px] font-bold text-emerald-400 hover:text-emerald-600 uppercase tracking-tighter"
               >
-                Or submit a feedback form &rarr;
+                Deactivate
               </button>
-            </div>
-          </motion.div>
-        );
-      default:
-        return null;
-    }
-  };
-
-  const renderStealthMode = () => (
-    <div className="min-h-screen bg-white text-zinc-800 font-serif p-12 max-w-4xl mx-auto shadow-2xl my-12 border border-zinc-200">
-      <div className="flex items-center justify-between mb-8 pb-4 border-b border-zinc-200">
-        <h1 className="text-3xl font-bold text-zinc-900">Research Paper: Cognitive Development in Digital Environments</h1>
-        <div className="flex items-center gap-4 text-xs text-zinc-400">
-          <span>Last edited 2 minutes ago</span>
-          <button onClick={() => setIsStealthMode(false)} className="hover:text-zinc-900">Exit</button>
-        </div>
+            </motion.div>
+          )}
+        </motion.div>
+        
+        <footer className="mt-12 flex flex-col items-center gap-2 opacity-50">
+          <p 
+            onClick={() => {
+              const nextCount = devClickCount + 1;
+              setDevClickCount(nextCount);
+              if (nextCount >= 5) {
+                setIsDeveloper(true);
+                setActiveTab('admin');
+                alert('Developer Mode Unlocked! Redirecting to Admin Console...');
+                setDevClickCount(0);
+              }
+            }}
+            className="text-[10px] font-tamil text-zinc-400 font-medium tracking-wide cursor-pointer select-none"
+          >
+            அயன்ஸ் சதீஷ் அவர்களால் அன்புடன் உருவாக்கப்பட்டது
+          </p>
+          <p className="text-[8px] font-bold text-zinc-300 uppercase tracking-widest">
+            © 2026 StudyFlow
+          </p>
+        </footer>
       </div>
-      <div className="space-y-6 text-lg leading-relaxed text-justify">
-        <p className="font-bold">Abstract</p>
-        <p>
-          This study investigates the impact of interactive digital modules on cognitive retention and executive function in adolescent learners. 
-          Preliminary data suggests a significant correlation between gamified learning environments and increased engagement metrics.
-        </p>
-        <p className="font-bold">1. Introduction</p>
-        <p>
-          The evolution of educational technology has necessitated a reevaluation of traditional pedagogical frameworks. 
-          As digital native populations continue to expand, the integration of interactive elements into core curricula has become a subject of intense academic scrutiny.
-        </p>
-        <p>
-          Our research focuses on the "StudyFlow" methodology, which prioritizes fluid transitions between focused study sessions and cognitive stimulation modules. 
-          This approach aims to mitigate the effects of cognitive fatigue and optimize the "flow state" during complex problem-solving tasks.
-        </p>
-        <p className="font-bold">2. Methodology</p>
-        <p>
-          The experimental group was provided with access to a suite of interactive modules designed to stimulate various cognitive domains, including spatial reasoning, pattern recognition, and rapid decision-making. 
-          The control group utilized traditional static study materials.
-        </p>
-        <div className="bg-zinc-50 p-8 border border-zinc-200 rounded-lg my-8">
-          <p className="text-sm font-mono text-zinc-500 mb-4">Table 1: Cognitive Domain Mapping</p>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div className="font-bold">Domain</div>
-            <div className="font-bold">Module Type</div>
-            <div>Spatial Reasoning</div>
-            <div>Interactive Grid Systems</div>
-            <div>Pattern Recognition</div>
-            <div>Sequential Logic Modules</div>
-            <div>Executive Function</div>
-            <div>Rapid Response Simulators</div>
-          </div>
-        </div>
-        <p>
-          Data collection involved bi-weekly assessments of task completion rates and qualitative feedback regarding perceived mental workload. 
-          Initial findings indicate that the experimental group demonstrated a 15% improvement in sustained attention spans over a six-week period.
-        </p>
-      </div>
-    </div>
-  );
+    );
+  }
 
   return (
-    <div className={`min-h-screen bg-[#F9F9F8] text-zinc-900 font-sans selection:bg-zinc-200 ${isStealthMode ? 'bg-zinc-100' : ''}`}>
+    <div className={`min-h-screen bg-[#F9F9F8] text-zinc-900 font-sans selection:bg-zinc-900 selection:text-white ${isStealthMode ? 'bg-white' : ''}`}>
+      {isDeveloper && !isStealthMode && (
+        <div className="bg-emerald-600 text-white text-[11px] font-black uppercase tracking-[0.3em] py-3 text-center fixed top-0 left-0 right-0 z-[100] shadow-lg flex items-center justify-center gap-4">
+          <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+          DEVELOPER MODE ACTIVE • ADMIN CONSOLE UNLOCKED
+          <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+        </div>
+      )}
       {isStealthMode ? (
-        renderStealthMode()
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="p-16 max-w-4xl mx-auto font-serif leading-relaxed text-zinc-800"
+        >
+          <div className="flex justify-between items-center mb-12 border-b border-zinc-200 pb-6">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">Analysis of Cognitive Load in Digital Environments</h1>
+              <p className="text-sm text-zinc-500 italic">Department of Educational Psychology • February 2026</p>
+            </div>
+            <button 
+              onClick={() => setIsStealthMode(false)} 
+              className="px-4 py-2 bg-zinc-100 rounded-lg text-xs font-bold hover:bg-zinc-200 transition-all"
+            >
+              Close Document
+            </button>
+          </div>
+          <div className="space-y-6 text-lg">
+            <p className="font-bold">Abstract</p>
+            <p>This study investigates the impact of multi-modal digital interfaces on student focus and information retention. By analyzing user interaction patterns within structured learning environments, we aim to identify the optimal balance between utility and cognitive distraction.</p>
+            <p className="font-bold">1. Introduction</p>
+            <p>The proliferation of web-based educational tools has transformed the landscape of modern pedagogy. However, the risk of "digital fatigue" remains a significant hurdle for effective learning. Our research suggests that minimalist design patterns can mitigate this effect...</p>
+            <p>Further analysis reveals that consistent study intervals, combined with auditory focus aids, significantly improve the rate of knowledge acquisition in secondary education settings...</p>
+          </div>
+        </motion.div>
       ) : (
         <>
           {/* Navigation */}
-          <nav className="fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-b border-zinc-100 z-40">
-        <div className="max-w-7xl mx-auto px-8 h-20 flex items-center justify-between">
-          <div className="flex flex-col cursor-pointer group" onClick={() => setActiveTab('dashboard')}>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center group-hover:rotate-6 transition-transform">
-                <span className="text-white font-black text-xl">S</span>
+          <nav 
+            className="fixed left-0 right-0 bg-white/80 backdrop-blur-xl border-b border-zinc-100 z-40 transition-all"
+            style={{ top: isDeveloper && !isStealthMode ? '44px' : '0' }}
+          >
+            <div className="max-w-7xl mx-auto px-8 h-20 flex items-center justify-between">
+              <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setActiveTab('dashboard')}>
+                <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center group-hover:rotate-6 transition-transform">
+                  <span className="text-white font-black text-xl">S</span>
+                </div>
+                <span className="font-black tracking-tighter text-2xl">StudyFlow</span>
               </div>
-              <span className="font-black tracking-tighter text-2xl">StudyFlow</span>
-            </div>
-            <span className="text-[10px] font-bold text-zinc-400 ml-13 -mt-1 font-tamil">made by அநாமதேய</span>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            {user && (
-              <>
+              
+              <div className="flex items-center gap-2">
                 <button 
-                  onClick={() => setIsStealthMode(!isStealthMode)}
-                  className={`p-3 rounded-2xl border transition-all ${isStealthMode ? 'bg-zinc-900 text-white border-zinc-900' : 'bg-zinc-50 border-zinc-100 text-zinc-400'}`}
-                  title="Toggle Stealth Mode"
+                  onClick={() => setIsStealthMode(true)}
+                  className="p-3 bg-zinc-50 border border-zinc-100 rounded-2xl text-zinc-400 hover:text-zinc-900 transition-all"
+                  title="Stealth Mode (Research Paper)"
                 >
                   <FileText className="w-5 h-5" />
                 </button>
@@ -1059,197 +315,409 @@ export default function App() {
                 >
                   <Shield className="w-5 h-5" />
                 </button>
-                <button 
-                  onClick={openAboutBlank}
-                  className="p-3 bg-zinc-50 border border-zinc-100 rounded-2xl text-zinc-400 hover:text-zinc-900 transition-all"
-                  title="Open in About:Blank"
-                >
-                  <ExternalLink className="w-5 h-5" />
-                </button>
+                
+                <div className="h-8 w-px bg-zinc-100 mx-2" />
+                
                 <NavButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<Clock className="w-5 h-5" />} label="Dashboard" />
                 <NavButton active={activeTab === 'notes'} onClick={() => setActiveTab('notes')} icon={<StickyNote className="w-5 h-5" />} label="Notes" />
-                <NavButton active={activeTab === 'music'} onClick={() => setActiveTab('music')} icon={<Music className="w-5 h-5" />} label="Music" />
                 <NavButton active={activeTab === 'resources'} onClick={() => setActiveTab('resources')} icon={<BookOpen className="w-5 h-5" />} label="Resources" />
                 <NavButton active={activeTab === 'feedback'} onClick={() => setActiveTab('feedback')} icon={<MessageSquare className="w-5 h-5" />} label="Feedback" />
-                <div className="h-8 w-px bg-zinc-100 mx-2" />
-                <div className="flex items-center gap-3 pl-2">
-                  <div className="text-right hidden sm:block">
-                    <p className="text-xs font-bold text-zinc-900">{user.username}</p>
-                    <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">{stats.streak} Day Streak</p>
-                  </div>
-                  <button 
-                    onClick={handleLogout}
-                    className="w-10 h-10 bg-zinc-50 rounded-xl flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 transition-all"
-                    title="Logout"
-                  >
-                    <LogOut className="w-5 h-5" />
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </nav>
-
-      {/* Main Content */}
-      <main className="pt-36 pb-24 px-8">
-        {renderContent()}
-      </main>
-        </>
-      )}
-
-      {/* Game Modal */}
-      <AnimatePresence>
-        {selectedGame && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-12 bg-zinc-900/80 backdrop-blur-md"
-          >
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="bg-white w-full max-w-7xl h-full rounded-[3rem] overflow-hidden flex flex-col shadow-2xl"
-            >
-              <div className="px-8 py-6 border-b border-zinc-100 flex items-center justify-between bg-white">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-zinc-100 rounded-2xl flex items-center justify-center">
-                    <BookOpen className="w-6 h-6 text-zinc-900" />
-                  </div>
-                  <div>
-                    <h3 className="font-black text-xl text-zinc-900">{selectedGame.title}</h3>
-                    <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Interactive Learning Session</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <button 
-                    onClick={() => {
-                      const score = prompt("Enter your high score or level reached:");
-                      if (score) saveGameProgress(selectedGame.id, selectedGame.title, 0, score);
-                    }}
-                    className="px-6 py-3 bg-zinc-100 text-zinc-900 rounded-2xl text-xs font-bold hover:bg-zinc-200 transition-all flex items-center gap-2"
-                  >
-                    <Shield className="w-4 h-4" />
-                    Log Achievement
-                  </button>
-                  <button 
-                    onClick={() => {
-                      const iframe = document.querySelector('iframe[title="' + selectedGame.title + '"]');
-                      if (iframe) {
-                        if (iframe.requestFullscreen) iframe.requestFullscreen();
-                        else if (iframe.webkitRequestFullscreen) iframe.webkitRequestFullscreen();
-                        else if (iframe.msRequestFullscreen) iframe.msRequestFullscreen();
-                      }
-                    }}
-                    className="w-12 h-12 hover:bg-zinc-50 rounded-2xl flex items-center justify-center transition-all"
-                    title="Fullscreen"
-                  >
-                    <ExternalLink className="w-5 h-5 text-zinc-400" />
-                  </button>
-                  <button 
-                    onClick={() => {
-                      setIsGameLoading(true);
-                      const iframe = document.querySelector('iframe[title="' + selectedGame.title + '"]');
-                      if (iframe) iframe.src = iframe.src;
-                    }}
-                    className="w-12 h-12 hover:bg-zinc-50 rounded-2xl flex items-center justify-center transition-all"
-                    title="Reload Game"
-                  >
-                    <Clock className="w-5 h-5 text-zinc-400" />
-                  </button>
-                  <button 
-                    onClick={() => setSelectedGame(null)}
-                    className="w-12 h-12 hover:bg-zinc-50 rounded-2xl flex items-center justify-center transition-all"
-                  >
-                    <X className="w-8 h-8 text-zinc-400" />
-                  </button>
-                </div>
-              </div>
-              <div className="flex-1 bg-zinc-950 relative">
-                {/* Loading Iframe */}
-                <iframe 
-                  src="/loading.html" 
-                  className="absolute inset-0 w-full h-full border-none z-10 transition-opacity duration-500"
-                  style={{ display: isGameLoading ? 'block' : 'none' }}
-                  title="Loading"
-                />
                 
-                {/* Game Iframe */}
-                <iframe 
-                  src={selectedGame.url} 
-                  className="w-full h-full border-none"
-                  title={selectedGame.title}
-                  onLoad={() => setIsGameLoading(false)}
-                  allow="fullscreen; autoplay; encrypted-media; pointer-lock; cross-origin-isolated"
-                  allowFullScreen
-                />
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <footer className="py-12 text-center border-t border-zinc-100 bg-white">
-        <p className="text-zinc-400 text-sm font-medium">&copy; 2026 StudyFlow Productivity Suite. All rights reserved.</p>
-        <div className="flex justify-center gap-6 mt-4 text-xs font-bold text-zinc-300 uppercase tracking-widest">
-          <button onClick={() => setActiveTab('privacy')} className="hover:text-zinc-900 transition-colors">Privacy</button>
-          <button onClick={() => setActiveTab('terms')} className="hover:text-zinc-900 transition-colors">Terms</button>
-          <button onClick={() => setActiveTab('support')} className="hover:text-zinc-900 transition-colors">Support</button>
-          <button onClick={() => setActiveTab('credits')} className="hover:text-zinc-900 transition-colors">Credits</button>
-        </div>
-      </footer>
-    </div>
-  );
-}
-
-function ResourceSection({ title, links }) {
-  return (
-    <div className="bg-white p-10 rounded-[2.5rem] border border-zinc-100 shadow-sm">
-      <h3 className="text-sm font-black text-zinc-400 uppercase tracking-[0.2em] mb-8">{title}</h3>
-      <div className="space-y-6">
-        {links.map(link => (
-          <a 
-            key={link.name} 
-            href={link.url} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="group block"
-          >
-            <div className="flex items-start justify-between">
-              <div>
-                <h4 className="font-bold text-lg group-hover:text-zinc-600 transition-colors flex items-center gap-2">
-                  {link.name}
-                  <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-all" />
-                </h4>
-                <p className="text-sm text-zinc-400 mt-1">{link.desc}</p>
-              </div>
-              <div className="w-8 h-8 rounded-full bg-zinc-50 flex items-center justify-center group-hover:bg-zinc-900 group-hover:text-white transition-all">
-                <ChevronRight className="w-4 h-4" />
+                {isDeveloper && (
+                  <button 
+                    onClick={() => setActiveTab('admin')}
+                    className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-black transition-all ${activeTab === 'admin' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/40 scale-105' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'}`}
+                  >
+                    <Lock className="w-4 h-4" />
+                    <span>ADMIN CONSOLE</span>
+                  </button>
+                )}
+                
+                <div className="h-8 w-px bg-zinc-100 mx-2" />
+                
+                <button 
+                  onClick={handleLogout}
+                  className="p-3 bg-zinc-50 border border-zinc-100 rounded-2xl text-zinc-400 hover:text-red-500 hover:bg-red-50 transition-all"
+                  title="Logout"
+                >
+                  <LogOut className="w-5 h-5" />
+                </button>
               </div>
             </div>
-          </a>
-        ))}
-      </div>
+          </nav>
+
+          {/* Main Content */}
+          <main 
+            className="pb-24 px-8 max-w-7xl mx-auto transition-all"
+            style={{ paddingTop: isDeveloper && !isStealthMode ? '176px' : '128px' }}
+          >
+            <AnimatePresence mode="wait">
+              {activeTab === 'dashboard' && (
+                <motion.div 
+                  key="dashboard"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-12"
+                >
+                  <header className="flex items-end justify-between">
+                    <div>
+                      <p className="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-2">Good afternoon,</p>
+                      <h2 className="text-6xl font-black tracking-tighter">{user.username}</h2>
+                    </div>
+                    <div className="flex gap-4">
+                      <StatCard label="Streak" value={`${stats.streak} Days`} />
+                      <StatCard label="Sessions" value={stats.sessions} />
+                      <StatCard label="Focus Time" value={stats.focusTime} />
+                    </div>
+                  </header>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* Timer Card */}
+                    <div className="lg:col-span-2 bg-white p-12 rounded-[3.5rem] shadow-sm border border-zinc-100 flex flex-col items-center justify-center relative overflow-hidden">
+                      <div className="absolute top-0 left-0 w-full h-1 bg-zinc-100">
+                        <motion.div 
+                          className="h-full bg-zinc-900"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${(timer / (25 * 60)) * 100}%` }}
+                        />
+                      </div>
+                      <h3 className="text-[10rem] font-black tracking-tighter leading-none mb-8 tabular-nums">
+                        {formatTime(timer)}
+                      </h3>
+                      <div className="flex gap-4">
+                        <button 
+                          onClick={() => setIsTimerRunning(!isTimerRunning)}
+                          className={`px-12 py-6 rounded-3xl font-black text-xl transition-all shadow-xl ${isTimerRunning ? 'bg-zinc-100 text-zinc-900' : 'bg-zinc-900 text-white shadow-zinc-900/20'}`}
+                        >
+                          {isTimerRunning ? <Pause className="w-8 h-8" /> : <Play className="w-8 h-8" />}
+                        </button>
+                        <button 
+                          onClick={() => { setTimer(25 * 60); setIsTimerRunning(false); }}
+                          className="p-6 bg-zinc-50 text-zinc-400 rounded-3xl hover:text-zinc-900 transition-all border border-zinc-100"
+                        >
+                          <RotateCcw className="w-8 h-8" />
+                        </button>
+                      </div>
+                      <div className="mt-12 flex gap-8">
+                        <TimerPreset label="Focus" active={timer === 25*60} onClick={() => setTimer(25*60)} />
+                        <TimerPreset label="Short Break" active={timer === 5*60} onClick={() => setTimer(5*60)} />
+                        <TimerPreset label="Long Break" active={timer === 15*60} onClick={() => setTimer(15*60)} />
+                      </div>
+                    </div>
+
+                    {/* Music Card */}
+                    <div className="bg-zinc-900 p-10 rounded-[3.5rem] text-white flex flex-col">
+                      <div className="flex items-center gap-3 mb-8">
+                        <Music className="w-6 h-6 text-zinc-400" />
+                        <h3 className="font-black text-xl">Focus Audio</h3>
+                      </div>
+                      <div className="space-y-3 flex-1">
+                        {MUSIC_PRESETS.map(preset => (
+                          <button 
+                            key={preset.id}
+                            onClick={() => setActiveMusic(preset)}
+                            className={`w-full p-5 rounded-2xl flex items-center justify-between transition-all ${activeMusic?.id === preset.id ? 'bg-white text-zinc-900' : 'bg-white/5 hover:bg-white/10 text-zinc-400'}`}
+                          >
+                            <span className="font-bold">{preset.name}</span>
+                            {activeMusic?.id === preset.id ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                          </button>
+                        ))}
+                      </div>
+                      {activeMusic && (
+                        <div className="mt-8 pt-8 border-t border-white/10">
+                          <iframe 
+                            width="100%" 
+                            height="80" 
+                            src={`${activeMusic.url}?autoplay=1`}
+                            className="rounded-xl opacity-0 absolute pointer-events-none"
+                            allow="autoplay"
+                          />
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center animate-pulse">
+                              <Youtube className="w-6 h-6" />
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Now Playing</p>
+                              <p className="font-bold text-sm">{activeMusic.name}</p>
+                            </div>
+                            <button onClick={() => setActiveMusic(null)} className="ml-auto p-2 hover:bg-white/10 rounded-lg">
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {activeTab === 'notes' && (
+                <motion.div 
+                  key="notes"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-12"
+                >
+                  <h2 className="text-6xl font-black tracking-tighter">My Notes</h2>
+                  <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                    <div className="lg:col-span-1 bg-white p-8 rounded-[2.5rem] shadow-sm border border-zinc-100 h-fit sticky top-32">
+                      <h3 className="font-black text-lg mb-6">New Note</h3>
+                      <input 
+                        type="text"
+                        placeholder="Title"
+                        className="w-full mb-4 px-6 py-4 bg-zinc-50 border border-zinc-100 rounded-2xl focus:outline-none font-bold"
+                        value={currentNote.title}
+                        onChange={e => setCurrentNote({...currentNote, title: e.target.value})}
+                      />
+                      <textarea 
+                        placeholder="Start writing..."
+                        className="w-full h-64 mb-6 px-6 py-4 bg-zinc-50 border border-zinc-100 rounded-2xl focus:outline-none resize-none text-sm leading-relaxed"
+                        value={currentNote.content}
+                        onChange={e => setCurrentNote({...currentNote, content: e.target.value})}
+                      />
+                      <button 
+                        onClick={saveNote}
+                        className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all flex items-center justify-center gap-2"
+                      >
+                        <Save className="w-4 h-4" />
+                        Save Note
+                      </button>
+                    </div>
+                    <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {notes.map(note => (
+                        <motion.div 
+                          layout
+                          key={note.id} 
+                          className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-zinc-100 relative group hover:shadow-md transition-all"
+                        >
+                          <button 
+                            onClick={() => deleteNote(note.id)}
+                            className="absolute top-6 right-6 p-3 text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-xl opacity-0 group-hover:opacity-100 transition-all"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                          <h4 className="font-black text-xl mb-4 pr-12">{note.title}</h4>
+                          <p className="text-zinc-500 leading-relaxed whitespace-pre-wrap">{note.content}</p>
+                          <p className="mt-8 text-[10px] font-bold text-zinc-300 uppercase tracking-widest">
+                            {new Date(note.id).toLocaleDateString()}
+                          </p>
+                        </motion.div>
+                      ))}
+                      {notes.length === 0 && (
+                        <div className="col-span-full py-24 flex flex-col items-center justify-center text-zinc-300 border-2 border-dashed border-zinc-100 rounded-[3rem]">
+                          <StickyNote className="w-12 h-12 mb-4 opacity-20" />
+                          <p className="font-bold">No notes yet. Start your first session.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {activeTab === 'resources' && (
+                <motion.div 
+                  key="resources"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-12"
+                >
+                  <h2 className="text-6xl font-black tracking-tighter">Resources</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {STUDY_RESOURCES.map((res, idx) => (
+                      <a 
+                        key={idx}
+                        href={res.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-zinc-100 hover:shadow-md hover:-translate-y-1 transition-all group"
+                      >
+                        <div className="w-12 h-12 bg-zinc-50 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-zinc-900 group-hover:text-white transition-colors">
+                          <ExternalLink className="w-5 h-5" />
+                        </div>
+                        <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{res.category}</p>
+                        <h4 className="font-black text-lg">{res.title}</h4>
+                      </a>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+
+              {activeTab === 'feedback' && (
+                <motion.div 
+                  key="feedback"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="max-w-2xl mx-auto space-y-12"
+                >
+                  <h2 className="text-6xl font-black tracking-tighter">Feedback</h2>
+                  <div className="bg-white p-12 rounded-[3.5rem] shadow-sm border border-zinc-100">
+                    {feedbackSent ? (
+                      <div className="text-center py-12">
+                        <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                          <CheckCircle2 className="w-10 h-10" />
+                        </div>
+                        <h3 className="text-2xl font-black mb-2">Message Sent!</h3>
+                        <p className="text-zinc-400 mb-8">Thank you for your feedback. We'll look into it.</p>
+                        <button 
+                          onClick={() => setFeedbackSent(false)}
+                          className="px-8 py-4 bg-zinc-900 text-white rounded-2xl font-bold"
+                        >
+                          Send Another
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        <div>
+                          <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Subject</label>
+                          <input 
+                            type="text"
+                            className="w-full px-6 py-4 bg-zinc-50 border border-zinc-100 rounded-2xl focus:outline-none"
+                            value={feedbackForm.subject}
+                            onChange={e => setFeedbackForm({...feedbackForm, subject: e.target.value})}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2 ml-1">Message</label>
+                          <textarea 
+                            className="w-full h-48 px-6 py-4 bg-zinc-50 border border-zinc-100 rounded-2xl focus:outline-none resize-none"
+                            value={feedbackForm.message}
+                            onChange={e => setFeedbackForm({...feedbackForm, message: e.target.value})}
+                          />
+                        </div>
+                        <button 
+                          onClick={handleFeedbackSubmit}
+                          className="w-full py-5 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all"
+                        >
+                          Submit Feedback
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+
+              {activeTab === 'admin' && isDeveloper && (
+                <motion.div 
+                  key="admin"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-12"
+                >
+                  <div className="flex justify-between items-end">
+                    <h2 className="text-6xl font-black tracking-tighter">Admin Console</h2>
+                    <div className="bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100">
+                      <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Developer Mode Active</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="lg:col-span-2 bg-white p-10 rounded-[3rem] shadow-sm border border-zinc-100 flex flex-col items-center">
+                      <div className="w-full flex items-center justify-between mb-8">
+                        <h3 className="font-black text-xl flex items-center gap-2">
+                          <Play className="w-5 h-5 text-orange-500" />
+                          GunSpin (Hidden Game)
+                        </h3>
+                        <span className="text-[10px] font-bold text-zinc-300 uppercase tracking-widest">Iframe Mode</span>
+                      </div>
+                      <div 
+                        className="bg-zinc-50 p-2 rounded-[2rem] border border-zinc-100 overflow-hidden shadow-inner"
+                        dangerouslySetInnerHTML={{ __html: gamesData.game_embed.code }}
+                      />
+                    </div>
+
+                    <div className="space-y-8">
+                      <div className="bg-white p-10 rounded-[2.5rem] border border-zinc-100 shadow-sm">
+                        <h3 className="font-black text-xl mb-4">System Status</h3>
+                        <div className="space-y-4">
+                          <div className="flex justify-between items-center">
+                            <span className="text-zinc-400 font-bold text-sm">Version</span>
+                            <span className="text-zinc-900 font-bold text-sm">1.0.4-stable</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-zinc-400 font-bold text-sm">Environment</span>
+                            <span className="text-zinc-900 font-bold text-sm">Production</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="bg-white p-10 rounded-[2.5rem] border border-zinc-100 shadow-sm">
+                        <h3 className="font-black text-xl mb-4">Quick Actions</h3>
+                        <button className="w-full py-3 bg-zinc-50 hover:bg-zinc-100 rounded-xl text-sm font-bold transition-all mb-2">Clear Local Cache</button>
+                        <button className="w-full py-3 bg-zinc-50 hover:bg-zinc-100 rounded-xl text-sm font-bold transition-all">Export User Data</button>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </main>
+
+          <footer className="max-w-7xl mx-auto px-8 py-12 border-t border-zinc-100 flex flex-col items-center gap-4">
+            <div className="flex items-center gap-2 text-zinc-400">
+              <div className="w-6 h-6 bg-zinc-100 rounded-lg flex items-center justify-center">
+                <span className="text-zinc-900 font-black text-xs">S</span>
+              </div>
+              <span className="font-bold text-sm tracking-tight">StudyFlow</span>
+            </div>
+            <p 
+              onClick={() => {
+                const nextCount = devClickCount + 1;
+                setDevClickCount(nextCount);
+                if (nextCount >= 5) {
+                  setIsDeveloper(true);
+                  setActiveTab('admin');
+                  alert('Developer Mode Unlocked! Redirecting to Admin Console...');
+                  setDevClickCount(0);
+                }
+              }}
+              className="text-sm font-tamil text-zinc-500 font-bold tracking-wide cursor-pointer select-none"
+            >
+              அயன்ஸ் சதீஷ் அவர்களால் அன்புடன் உருவாக்கப்பட்டது
+            </p>
+            <p className="text-[10px] font-bold text-zinc-300 uppercase tracking-widest">
+              © 2026 StudyFlow • Crafted with Precision
+            </p>
+          </footer>
+        </>
+      )}
     </div>
   );
 }
+
+// --- Sub-components ---
 
 function NavButton({ active, onClick, icon, label }) {
   return (
     <button 
       onClick={onClick}
-      className={`
-        flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold transition-all
-        ${active 
-          ? 'bg-zinc-900 text-white shadow-xl shadow-zinc-900/20' 
-          : 'text-zinc-400 hover:text-zinc-900 hover:bg-zinc-50'
-        }
-      `}
+      className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-bold transition-all ${active ? 'bg-zinc-900 text-white shadow-lg shadow-zinc-900/10' : 'text-zinc-400 hover:text-zinc-900 hover:bg-zinc-50'}`}
     >
       {icon}
-      <span className="hidden lg:inline">{label}</span>
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function StatCard({ label, value }) {
+  return (
+    <div className="bg-white px-6 py-4 rounded-2xl border border-zinc-100 shadow-sm text-center min-w-[100px]">
+      <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{label}</p>
+      <p className="font-black text-lg text-zinc-900">{value}</p>
+    </div>
+  );
+}
+
+function TimerPreset({ label, active, onClick }) {
+  return (
+    <button 
+      onClick={onClick}
+      className={`px-6 py-3 rounded-xl text-xs font-bold transition-all ${active ? 'bg-zinc-900 text-white' : 'text-zinc-400 hover:text-zinc-900 hover:bg-zinc-50'}`}
+    >
+      {label}
     </button>
   );
 }
