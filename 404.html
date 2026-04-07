@@ -10,7 +10,7 @@
       // string into just a query string, and then redirects the browser
       // to the new url with only a query string and hash fragment,
       // e.g. http://www.foo.tld/one/two?a=b#c -> http://www.foo.tld/?/one/two&a=b#c
-      var pathSegmentsToKeep = 0;
+      var pathSegmentsToKeep = 1;
 
       var l = window.location;
       l.replace(
