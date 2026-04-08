@@ -1,47 +1,169 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="referrer" content="no-referrer" />
-    <title>Google Classroom</title>
-    <link rel="icon" href="https://ssl.gstatic.com/classroom/favicon.png" />
-    <script type="text/javascript">
-      // Single Page Apps for GitHub Pages
-      // https://github.com/rafgraph/spa-github-pages
-      // This script takes the current url and converts the path and query
-      // string into just a query string, and then redirects the browser
-      // to the new url with only a query string and hash fragment,
-      // e.g. http://www.foo.tld/one/two?a=b#c -> http://www.foo.tld/?/one/two&a=b#c
-      // Note: this script is only necessary if you use browserHistory
-      (function(l) {
-        if (l.search[1] === '/' ) {
-          var decoded = l.search.slice(1).split('&').map(function(s) { 
-            return s.replace(/~and~/g, '&')
-          }).join('?');
-          window.history.replaceState(null, null,
-              l.pathname.slice(0, -1) + decoded + l.hash
-          );
-        }
-      }(window.location))
-    </script>
-    <style>
-      body { margin: 0; padding: 0; }
-    </style>
-  </head>
-  <body>
-    <div id="root">
-      <div style="font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; background: #F9F9F8; color: #A1A1AA;">
-        <p>Loading StudyFlow...</p>
-      </div>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StudyFlow</title>
+    <!-- Tailwind via CDN for rapid, reliable styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="./style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-overlay">
+        <div class="text-center">
+            <div class="inline-block w-8 h-8 border-4 border-zinc-900 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p class="font-bold text-zinc-400">Loading StudyFlow...</p>
+        </div>
     </div>
-    <noscript>
-      <div style="text-align: center; padding: 50px;">
-        <h1>JavaScript is Required</h1>
-        <p>Please enable JavaScript to use StudyFlow.</p>
-      </div>
-    </noscript>
-    <script type="module" src="./src/main.jsx"></script>
-  </body>
-</html>
 
+    <!-- Main Application View -->
+    <div id="main-view">
+        <!-- Developer Banner -->
+        <div id="dev-banner" class="hidden bg-emerald-600 text-white py-2 text-center text-xs font-black uppercase tracking-widest animate-pulse">
+            Developer Mode Active • Admin Console Unlocked
+        </div>
+
+        <!-- Navigation -->
+        <nav>
+            <div class="container flex items-center justify-between">
+                <div class="flex items-center gap-8">
+                    <h1 class="text-2xl font-black tracking-tighter">StudyFlow</h1>
+                    <div class="hidden md:flex gap-2">
+                        <button class="nav-btn active" data-tab="dashboard">Dashboard</button>
+                        <button class="nav-btn" data-tab="timer">Timer</button>
+                        <button class="nav-btn" data-tab="notes">Notes</button>
+                        <button class="nav-btn" data-tab="resources">Resources</button>
+                        <button id="admin-tab" class="nav-btn hidden" data-tab="admin">Admin</button>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <button id="cloak-btn" onclick="toggleCloak()" class="btn btn-ghost" title="Toggle Tab Cloaking">
+                        <i data-lucide="shield"></i>
+                    </button>
+                    <button onclick="toggleStealth()" class="btn btn-ghost" title="Stealth Mode">
+                        <i data-lucide="eye-off"></i>
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <main class="container">
+            <!-- Dashboard Page -->
+            <section id="dashboard-page" class="page">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+                    <div class="card">
+                        <p class="text-zinc-400 font-bold uppercase text-xs mb-2">Current Streak</p>
+                        <h2 class="text-5xl font-black">12 <span class="text-xl text-zinc-400">days</span></h2>
+                    </div>
+                    <div class="card">
+                        <p class="text-zinc-400 font-bold uppercase text-xs mb-2">Focus Time</p>
+                        <h2 class="text-5xl font-black">42 <span class="text-xl text-zinc-400">hrs</span></h2>
+                    </div>
+                    <div class="card">
+                        <p class="text-zinc-400 font-bold uppercase text-xs mb-2">Sessions</p>
+                        <h2 class="text-5xl font-black">156</h2>
+                    </div>
+                </div>
+                <div class="card bg-zinc-900 text-white">
+                    <h3 class="text-3xl font-black mb-4">Welcome back, Ayan.</h3>
+                    <p class="text-zinc-400 mb-8">You're in the top 5% of students this week. Keep the momentum going.</p>
+                    <button onclick="state.activeTab='timer'; updateUI();" class="btn bg-white text-zinc-900">Start Session</button>
+                </div>
+            </section>
+
+            <!-- Timer Page -->
+            <section id="timer-page" class="page hidden">
+                <div class="card text-center max-w-2xl mx-auto">
+                    <div class="flex justify-center gap-4 mb-8">
+                        <button onclick="resetTimer(25*60)" class="btn btn-ghost">Focus</button>
+                        <button onclick="resetTimer(5*60)" class="btn btn-ghost">Short Break</button>
+                        <button onclick="resetTimer(15*60)" class="btn btn-ghost">Long Break</button>
+                    </div>
+                    <div id="timer-display" class="timer-display">25:00</div>
+                    <div class="flex justify-center gap-4">
+                        <button id="timer-toggle-btn" onclick="toggleTimer()" class="btn btn-primary p-6 rounded-full">
+                            <i data-lucide="play"></i>
+                        </button>
+                        <button onclick="resetTimer()" class="btn btn-ghost p-6 rounded-full">
+                            <i data-lucide="rotate-ccw"></i>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Notes Page -->
+            <section id="notes-page" class="page hidden">
+                <div class="card mb-8">
+                    <input id="note-title" type="text" placeholder="Note Title" class="w-full text-2xl font-black mb-4 outline-none border-none bg-transparent">
+                    <textarea id="note-content" placeholder="Start writing..." class="w-full h-32 outline-none border-none bg-transparent resize-none"></textarea>
+                    <div class="flex justify-end">
+                        <button onclick="saveNote()" class="btn btn-primary">Save Note</button>
+                    </div>
+                </div>
+                <div id="notes-list" class="notes-grid">
+                    <!-- Notes populated by JS -->
+                </div>
+            </section>
+
+            <!-- Resources Page -->
+            <section id="resources-page" class="page hidden">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <a href="https://classroom.google.com" target="_blank" class="card hover:border-zinc-900 transition-colors">
+                        <h4 class="text-xl font-black mb-2">Google Classroom</h4>
+                        <p class="text-zinc-400 text-sm">Access your assignments and course materials.</p>
+                    </a>
+                    <a href="https://docs.google.com" target="_blank" class="card hover:border-zinc-900 transition-colors">
+                        <h4 class="text-xl font-black mb-2">Google Docs</h4>
+                        <p class="text-zinc-400 text-sm">Create and edit documents for your projects.</p>
+                    </a>
+                </div>
+            </section>
+
+            <!-- Admin Page -->
+            <section id="admin-page" class="page hidden">
+                <div class="card mb-8">
+                    <h3 class="text-3xl font-black mb-4">Admin Console</h3>
+                    <p class="text-zinc-400 mb-8">System status: <span class="text-emerald-600 font-bold">OPTIMAL</span></p>
+                    
+                    <div class="bg-zinc-50 p-6 rounded-2xl mb-8">
+                        <h4 class="font-bold mb-4">GunSpin Game</h4>
+                        <div class="aspect-video bg-black rounded-xl overflow-hidden flex items-center justify-center">
+                            <iframe src="https://html5.gamedistribution.com/917cce8c44c44638a8cdc2a1794b65c8/?gd_sdk_referrer_url=https://gamedistribution.com/games/gunspin/" width="720" height="480" scrolling="none" frameborder="0"></iframe>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="container py-12 border-t border-zinc-100 flex justify-between items-center">
+            <p id="footer-tamil" class="text-zinc-400 text-sm cursor-pointer select-none">
+                அயன் சதீஷ் இதை உருவாக்கினார்
+            </p>
+            <p class="text-zinc-400 text-sm">© 2026 StudyFlow</p>
+        </footer>
+    </div>
+
+    <!-- Stealth View (Academic Paper) -->
+    <div id="stealth-view">
+        <h1 class="text-4xl mb-8">A Comprehensive Analysis of Cognitive Load in Digital Learning Environments</h1>
+        <p class="mb-4">Abstract: This paper explores the intersection of user interface design and educational efficacy...</p>
+        <p class="mb-4">Introduction: The rapid digitization of educational resources has necessitated a reevaluation of how students interact with information...</p>
+        <p class="mb-4">Methodology: We conducted a longitudinal study across three major universities...</p>
+        <button onclick="toggleStealth()" class="mt-12 text-zinc-300 hover:text-zinc-900 transition-colors">Return to Dashboard</button>
+    </div>
+
+    <script src="./script.js"></script>
+    <script>
+        // Initialize Lucide icons after DOM loads
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+        });
+    </script>
+</body>
+</html>
